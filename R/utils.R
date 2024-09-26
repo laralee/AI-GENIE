@@ -360,7 +360,7 @@ run_pipeline <- function(items, openai.key,
 
     ident <- ifelse(attributes(results[["main_result"]])$methods[["bootega_count"]] == "1",  TRUE, FALSE)
 
-    plot_networks(p1 = p1, p2 = p2,
+    plot_networks(p1 = itemStability(p1), p2 = itemStability(p2),
                                     caption1 = "Before BootEGA Step",
                                     caption2 = "After BootEGA Step",
                                     nmi2=results[["nmi"]],

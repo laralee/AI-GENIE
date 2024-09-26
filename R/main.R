@@ -399,7 +399,7 @@ GENIE <- function(items, openai.API, EGA_model="tmfg", plot=TRUE, plot.stability
 
   # run the pipeline
   run_pipeline <- run_pipeline(items = items, EGA_model = EGA_model,openai.key=openai.API,
-                               labels = items$type, keep.org=FALSE, plot = plot, plot.stability = FALSE,
+                               labels = items$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
                                silently= silently)
 
   return(run_pipeline)
