@@ -345,9 +345,11 @@ run_pipeline <- function(items, openai.key,
       p1 <- results[["initial_ega_obj"]]
       p2 <- results[["final_ega_obj"]]
 
-      plot_stability <- plot_networks(p1, p2, "Before AI-GENIE Network", "After AI-GENIE Network",
-                                      results[["nmi"]], results[["start_nmi"]], title)
-    plot(plot_networks)
+       plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Network",
+                                      caption2 = "After AI-GENIE Network",
+                                      nmi2 = results[["nmi"]],
+                                      nmi1 = results[["start_nmi"]],
+                                      scale.title = title, ident=FALSE)
     }
 
   if(plot.stability){
@@ -357,9 +359,14 @@ run_pipeline <- function(items, openai.key,
     nmi_start <- as.numeric(attributes(results[["main_result"]])$methods[["after_uva"]])
 
     ident <- ifelse(attributes(results[["main_result"]])$methods[["bootega_count"]] == "1",  TRUE, FALSE)
-    plot_stability <- plot_networks(p1, p2, "Before BootEGA Step", "After BootEGA Step",
-                                    results[["nmi"]], nmi_start, title, ident)
-    plot(plot_stability)
+
+    plot_networks(p1 = p1, p2 = p2,
+                                    caption1 = "Before BootEGA Step",
+                                    caption2 = "After BootEGA Step",
+                                    nmi2=results[["nmi"]],
+                                    nmi1=nmi_start,
+                                    scale.title = title,
+                                    ident=ident)
   }
 
   if(!silently){
@@ -385,14 +392,14 @@ run_pipeline <- function(items, openai.key,
 #' @param scale.title A character string specifying the title for the combined plot.
 #' @param ident Logical; specifies if the two bootEGA objects are the same (i.e., if there was only one round of bootEGA). Defaults to \code{FALSE}
 #' @return A combined plot object displaying the initial and final networks with captions and annotations.
-plot_networks <- function(p1, p2, cap1, cap2, nmi2, nmi1, scale.title, ident=FALSE){
+plot_networks <- function(p1, p2, caption1, caption2, nmi2, nmi1, scale.title, ident=FALSE){
 
   if(!ident){
   plot1 <- plot(p1) +
-    labs(caption = paste0(cap1," (NMI: ", round(nmi1,4) * 100, "%)"))
+    labs(caption = paste0(caption1," (NMI: ", round(nmi1,4) * 100, "%)"))
 
   plot2 <- plot(p2) +
-    labs(caption = paste0(cap2," (NMI: ", round(nmi2,4) * 100, "%)"))
+    labs(caption = paste0(caption2," (NMI: ", round(nmi2,4) * 100, "%)"))
 
   combined_plot <- plot1 + plot2 +
     plot_annotation(
@@ -405,21 +412,22 @@ plot_networks <- function(p1, p2, cap1, cap2, nmi2, nmi1, scale.title, ident=FAL
     )
 
 
-  return(combined_plot)}
+}
   else{
     plot1 <- plot(p1) +
-      labs(caption = paste0("No BootEGA Reduction - Only One Stability Plot Shown. (Final NMI:", round(nmi2,4) * 100, "%)")) +
+      labs(caption = paste0("No BootEGA Reduction - Stability Plot for All Items (", round(nmi2,4) * 100, "%)"))
+
+    combined_plot <- plot1 +
       plot_annotation(
-        title = "Stability Plot for Final Item Pool",
+        title = "Item Stability for All Final Items",
         subtitle = scale.title,
         theme = theme(
           plot.title = element_text(hjust = 0.5, size = 16),
-          plot.subtitle = element_text(hjust = 0.5, size = 10)
+          plot.subtitle = element_text(hjust = 0.5, size = 12)
         ))
-
-    return(plot1)
-
   }
+
+  plot(combined_plot)
 }
 
 

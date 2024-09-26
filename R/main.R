@@ -280,7 +280,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #'
 #' @param items A required data frame containing your item statements and item type labels. The data frame should have two columns: one containing the item statements and one containing the item type labels. The column names do not need to be specific; the function will determine which column contains the item statements and which contains the item type labels. There must be at least two distinct item types which each contain at least 15 items. The total number of unique items should be at least 50.
 #' @param openai.API A required character string of your OpenAI API key.
-#' @param EGA_model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `NULL`, in which case both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
+#' @param EGA_model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display summary network plots.
 #' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
 #' @param silently Logical; defaults to `FALSE`. When `TRUE`, suppresses console output.
@@ -389,7 +389,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #' # View the final item pool
 #' View(my.personality.inventory.results$main_result)
 #' }
-GENIE <- function(items, openai.API, EGA_model=NULL, plot=TRUE, plot.stability = FALSE, silently=FALSE, ...) {
+GENIE <- function(items, openai.API, EGA_model="tmfg", plot=TRUE, plot.stability = FALSE, silently=FALSE, ...) {
 
   # check the user-provided items
   checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA_model=EGA_model,

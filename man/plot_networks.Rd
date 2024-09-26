@@ -4,7 +4,16 @@
 \alias{plot_networks}
 \title{Plot Networks Before and After AI-GENIE Reduction}
 \usage{
-plot_networks(p1, p2, nmi2, nmi1, scale.title)
+plot_networks(
+  p1,
+  p2,
+  caption1,
+  caption2,
+  nmi2,
+  nmi1,
+  scale.title,
+  ident = FALSE
+)
 }
 \arguments{
 \item{p1}{An EGA object representing the initial network structure (or stability).}
@@ -13,9 +22,11 @@ plot_networks(p1, p2, nmi2, nmi1, scale.title)
 
 \item{nmi2}{Numeric; the Normalized Mutual Information (NMI) of the final item pool.}
 
-\item{nmi1}{Numeric; the NMI of the original item pool.}
+\item{nmi1}{Numeric; the NMI of the original item pool (or the item pool that was redundancy reduced, in the case of item stability).}
 
 \item{scale.title}{A character string specifying the title for the combined plot.}
+
+\item{ident}{Logical; specifies if the two bootEGA objects are the same (i.e., if there was only one round of bootEGA). Defaults to \code{FALSE}}
 }
 \value{
 A combined plot object displaying the initial and final networks with captions and annotations.
