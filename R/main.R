@@ -25,13 +25,16 @@
 #' @param adaptive Logical; defaults to `TRUE`. Indicates whether to use an adaptive prompting approach (recommended). When `TRUE`, the language model receives a list of previously generated items to avoid redundancy. Set to `FALSE` to skip this step if context length is a concern.
 #' @param EGA_model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
 #' @param keep.org Logical; defaults to `FALSE`. When `TRUE`, returns a data frame of the original item pool.
-#' @param plot Logical; defaults to `TRUE`. Specifies whether to display summary network plots.
+#' @param plot Logical; defaults to `TRUE`. Specifies whether to display the main summary network plots.
+#' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
 #' @param silently Logical; defaults to `FALSE`. When `TRUE`, suppresses console output.
 #' @return A list containing:
 #' \describe{
   #'   \item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns `ID`, `type`, `statement`, and `EGA_communities`.}
   #'   \item{\code{final_ega_obj}}{The final EGA object after reduction.}
-  #'   \item{\code{initial_ega_obj}}{The initial Exploratory Graph Analysis (EGA) object.}
+  #'   \item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
+  #'   \item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
+  #'   \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
   #'   \item{\code{embeddings}}{The embeddings generated for the items.}
   #'   \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
   #'   \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
@@ -194,7 +197,8 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
                     cleaning.fun = NULL, system.role = NULL,
                     scale.title = NULL, sub.domain = NULL, model = "gpt3.5", item.examples = NULL,
                     target.N = 100, temperature = 1, top.p = 1, items.only = FALSE, adaptive = TRUE,
-                    EGA_model = "tmfg", keep.org = FALSE, plot = TRUE, silently = FALSE, ...) {
+                    EGA_model = "tmfg", keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
+                    silently = FALSE, ...) {
 
   # Perform input validation
   validated_params <- AIGENIE_checks(
@@ -218,6 +222,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
     EGA_model = EGA_model,
     keep.org = keep.org,
     plot = plot,
+    plot.stability = plot.stability,
     silently = silently,
     ...
   )
@@ -256,6 +261,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
     EGA_model = EGA_model,
     keep.org = keep.org,
     plot = plot,
+    plot.stability = plot.stability,
     silently = silently,
     ...
   )
@@ -276,12 +282,15 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #' @param openai.API A required character string of your OpenAI API key.
 #' @param EGA_model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `NULL`, in which case both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display summary network plots.
+#' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
 #' @param silently Logical; defaults to `FALSE`. When `TRUE`, suppresses console output.
 #' @return A list containing:
 #' \describe{
 #'   \item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns `ID`, `type`, `statement`, and `EGA_communities`.}
 #'   \item{\code{final_ega_obj}}{The final EGA object after reduction.}
-#'   \item{\code{initial_ega_obj}}{The initial Exploratory Graph Analysis (EGA) object.}
+#'   \item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
+#'   \item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
+#'   \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 #'   \item{\code{embeddings}}{The embeddings generated for the items.}
 #'   \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 #'   \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
@@ -289,6 +298,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #'   \item{\code{start_nmi}}{The NMI of the original item pool.}
 #'   \item{\code{start_N}}{The starting sample size (number of items).}
 #'   \item{\code{final_N}}{The final sample size after reduction.}
+#'   \item{\code{original_items (optional)}}{(ONLY returns if `keep.org` is `TRUE`) The original sample generated.}
 #' }
 #' @export
 #' @examples
@@ -379,7 +389,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #' # View the final item pool
 #' View(my.personality.inventory.results$main_result)
 #' }
-GENIE <- function(items, openai.API, EGA_model=NULL, plot=TRUE, silently=FALSE, ...) {
+GENIE <- function(items, openai.API, EGA_model=NULL, plot=TRUE, plot.stability = FALSE, silently=FALSE, ...) {
 
   # check the user-provided items
   checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA_model=EGA_model,
@@ -389,7 +399,8 @@ GENIE <- function(items, openai.API, EGA_model=NULL, plot=TRUE, silently=FALSE, 
 
   # run the pipeline
   run_pipeline <- run_pipeline(items = items, EGA_model = EGA_model,openai.key=openai.API,
-                               labels = items$type, keep.org=FALSE, plot = plot, silently= silently)
+                               labels = items$type, keep.org=FALSE, plot = plot, plot.stability = FALSE,
+                               silently= silently)
 
   return(run_pipeline)
 

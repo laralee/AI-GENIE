@@ -25,6 +25,7 @@ AIGENIE_checks(
   EGA_model,
   keep.org,
   plot,
+  plot.stability,
   silently,
   ...
 )
@@ -69,6 +70,8 @@ AIGENIE_checks(
 \item{keep.org}{Logical; if \code{TRUE}, includes the original items in the returned results.}
 
 \item{plot}{Logical; if \code{TRUE}, displays the network plots.}
+
+\item{plot.stability}{Logical; Specifies whether to display the secondary network stability plots.}
 
 \item{silently}{Logical; if \code{TRUE}, suppresses console output.}
 

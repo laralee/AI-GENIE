@@ -24,6 +24,7 @@
 #' @param EGA_model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results.
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
+#' @param plot.stability Logical; Specifies whether to display the secondary network stability plots.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @param ... Additional arguments (currently not used).
 #' @return A list of validated and processed parameters ready for use in the \code{AIGENIE} function.
@@ -31,14 +32,14 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
                            user.prompts, item.type.definitions, cleaning.fun, system.role,
                            scale.title, sub.domain, model, item.examples,
                            target.N, temperature, top.p, items.only, adaptive, EGA_model,
-                           keep.org, plot, silently, ...) {
+                           keep.org, plot, plot.stability, silently, ...) {
 
   # Check for missing arguments (no NA values)
   check_no_na(item.attributes, openai.API, groq.API, custom,
               user.prompts, item.type.definitions, cleaning.fun, system.role,
               scale.title, sub.domain, model, item.examples,
               target.N, temperature, top.p, items.only, adaptive, EGA_model, keep.org,
-              plot, silently)
+              plot, plot.stability, silently)
 
   # Validate that 'silently' is a boolean
   if (!is.logical(silently) || length(silently) != 1) {
@@ -60,6 +61,9 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   }
   if (!is.logical(adaptive) || length(adaptive) != 1) {
     stop("'adaptive' must be a boolean.")
+  }
+  if (!is.logical(plot.stability) || length(plot.stability) != 1) {
+    stop("'plot.stability' must be a boolean.")
   }
 
   # Validate EGA_model

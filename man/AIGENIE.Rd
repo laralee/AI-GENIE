@@ -25,6 +25,7 @@ AIGENIE(
   EGA_model = "tmfg",
   keep.org = FALSE,
   plot = TRUE,
+  plot.stability = FALSE,
   silently = FALSE,
   ...
 )
@@ -68,7 +69,9 @@ AIGENIE(
 
 \item{keep.org}{Logical; defaults to \code{FALSE}. When \code{TRUE}, returns a data frame of the original item pool.}
 
-\item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display summary network plots.}
+\item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display the main summary network plots.}
+
+\item{plot.stability}{Logical; defaults to \code{FALSE}. Specifies whether to display the secondary network stability plots.}
 
 \item{silently}{Logical; defaults to \code{FALSE}. When \code{TRUE}, suppresses console output.}
 }
@@ -77,7 +80,9 @@ A list containing:
 \describe{
 \item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.}
 \item{\code{final_ega_obj}}{The final EGA object after reduction.}
-\item{\code{initial_ega_obj}}{The initial Exploratory Graph Analysis (EGA) object.}
+\item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
+\item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
+\item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 \item{\code{embeddings}}{The embeddings generated for the items.}
 \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 \item{\code{selected_model}}{The EGA model used throughout the pipeline.}

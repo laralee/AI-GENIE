@@ -7,9 +7,9 @@
 plot_networks(p1, p2, nmi2, nmi1, scale.title)
 }
 \arguments{
-\item{p1}{An EGA object representing the initial network structure.}
+\item{p1}{An EGA object representing the initial network structure (or stability).}
 
-\item{p2}{An EGA object representing the final network structure after AI-GENIE reduction.}
+\item{p2}{An EGA object representing the final network structure after AI-GENIE reduction (or stability).}
 
 \item{nmi2}{Numeric; the Normalized Mutual Information (NMI) of the final item pool.}
 

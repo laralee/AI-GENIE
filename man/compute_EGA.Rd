@@ -20,7 +20,7 @@ compute_EGA(items, EGA_model, embedding, openai.key, silently, ...)
 \item{...}{Additional arguments passed to underlying functions.}
 }
 \value{
-A list containing the main results, final and initial EGA objects, embeddings, NMI values, and item counts before and after reduction.
+A list containing the main results, final and initial EGA and bootEGA objects, embeddings, NMI values, and item counts before and after reduction.
 }
 \description{
 Computes the Exploratory Graph Analysis (EGA) steps using the specified EGA model. This function performs initial EGA, removes redundancies using Unique Variable Analysis (UVA), removes instabilities, and computes Normalized Mutual Information (NMI) values before and after AI-GENIE reduction.

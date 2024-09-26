@@ -304,6 +304,7 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
 
   # BootEGA
   bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, ...)
+  boot1 <- bootstrap
 
   # Check for instabilities
   while(any(bootstrap$stability$item.stability$item.stability$empirical.dimensions < cut.off)){
@@ -314,17 +315,22 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
     # Update items
     items <- items[,bootstrap$stability$item.stability$item.stability$empirical.dimensions > cut.off]
 
+
     # BootEGA
     bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, seed = 123,
                                  plot.itemStability = FALSE, ...)
 
+    current_boot <- bootstrap
   }
+
+  # Save final bootEGA object
+  boot2 <- current_boot
 
   # Add count to items
   attr(items, "bootEGA_count") <- count
 
   # Return items
-  return(items)
+  return(list(items=items, boot1=boot1, boot2=boot2))
 
 }
 
@@ -342,7 +348,7 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
 #' @param openai.key A character string of your OpenAI API key.
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
-#' @return A list containing the main results, EGA objects, embeddings, NMI values, and other analysis details.
+#' @return A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
 get_results <- function(items, EGA_model, openai.key, silently, ...) {
 
   # Define the possible models
@@ -401,7 +407,9 @@ get_results <- function(items, EGA_model, openai.key, silently, ...) {
   final_output <- list(
     main_result = chosen_result$main_result,
     final_ega_obj = chosen_result$final_ega_obj,
+    final_bootega_obj = chosen_result$final_bootega_obj,
     initial_ega_obj = chosen_result$initial_ega_obj,
+    initial_bootega_obj = chosen_result$initial_bootega_obj,
     embeddings = chosen_result$embeddings,
     embedding_type = attributes(chosen_result$main_result)$method[["embedding"]],
     selected_model = chosen_model,
@@ -469,7 +477,7 @@ print_results<-function(obj){
 #' @param openai.key A character string of your OpenAI API key.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @param ... Additional arguments passed to underlying functions.
-#' @return A list containing the main results, final and initial EGA objects, embeddings, NMI values, and item counts before and after reduction.
+#' @return A list containing the main results, final and initial EGA and bootEGA objects, embeddings, NMI values, and item counts before and after reduction.
 compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) {
   if(!silently){
     cat("\n")
@@ -534,19 +542,24 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
   }
 
   ## Remove instabilities
+  colnames(unique_items) <- items$ID[items$statement %in% colnames(unique_items)]
+
   tryCatch(
-  item_set <- remove_instabilities(items=unique_items,
+  boot_res <- remove_instabilities(items=unique_items,
                                    model = EGA_model, EGA.type = "EGA.fit", verbose = FALSE),
   error = function(e) {
     if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
       cat(" ...BootEGA failed. Trying new seed...")
-      item_set <- remove_instabilities(items=unique_items,
+      boot_res <- remove_instabilities(items=unique_items,
                                        model = EGA_model, EGA.type = "EGA.fit", verbose = FALSE,
                                        seed=sample(1:1000, 1))
     } else {
       stop(e)
     }}
   )
+
+  item_set <- boot_res[["items"]]
+  colnames(item_set) <- items$statement[items$ID %in% colnames(item_set)]
 
   if(!silently){
     cat(" bootEGA sweeps complete...")
@@ -598,7 +611,9 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
   return(list(
     main_result = result,
     final_ega_obj = final_ega,
+    final_bootega_obj = boot_res[["boot2"]],
     initial_ega_obj = before_ega,
+    initial_bootega_obj = boot_res[["boot1"]],
     embeddings = item_set,
     nmi = after_genie,
     start_nmi = before_nmi,

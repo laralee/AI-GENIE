@@ -18,7 +18,7 @@ get_results(items, EGA_model, openai.key, silently, ...)
 \item{...}{Additional arguments passed to underlying functions.}
 }
 \value{
-A list containing the main results, EGA objects, embeddings, NMI values, and other analysis details.
+A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
 }
 \description{
 Runs the AI-GENIE reduction analysis pipeline, including embeddings generation, redundancy removal using Unique Variable Analysis (UVA), instability removal, and EGA model selection based on Normalized Mutual Information (NMI).

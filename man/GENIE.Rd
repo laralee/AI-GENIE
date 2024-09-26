@@ -4,7 +4,15 @@
 \alias{GENIE}
 \title{GENIE (Item Validation and Reduction without Item Generation)}
 \usage{
-GENIE(items, openai.API, EGA_model = NULL, plot = TRUE, silently = FALSE, ...)
+GENIE(
+  items,
+  openai.API,
+  EGA_model = NULL,
+  plot = TRUE,
+  plot.stability = FALSE,
+  silently = FALSE,
+  ...
+)
 }
 \arguments{
 \item{items}{A required data frame containing your item statements and item type labels. The data frame should have two columns: one containing the item statements and one containing the item type labels. The column names do not need to be specific; the function will determine which column contains the item statements and which contains the item type labels. There must be at least two distinct item types which each contain at least 15 items. The total number of unique items should be at least 50.}
@@ -15,6 +23,8 @@ GENIE(items, openai.API, EGA_model = NULL, plot = TRUE, silently = FALSE, ...)
 
 \item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display summary network plots.}
 
+\item{plot.stability}{Logical; defaults to \code{FALSE}. Specifies whether to display the secondary network stability plots.}
+
 \item{silently}{Logical; defaults to \code{FALSE}. When \code{TRUE}, suppresses console output.}
 }
 \value{
@@ -22,7 +32,9 @@ A list containing:
 \describe{
 \item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.}
 \item{\code{final_ega_obj}}{The final EGA object after reduction.}
-\item{\code{initial_ega_obj}}{The initial Exploratory Graph Analysis (EGA) object.}
+\item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
+\item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
+\item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 \item{\code{embeddings}}{The embeddings generated for the items.}
 \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
@@ -30,6 +42,7 @@ A list containing:
 \item{\code{start_nmi}}{The NMI of the original item pool.}
 \item{\code{start_N}}{The starting sample size (number of items).}
 \item{\code{final_N}}{The final sample size after reduction.}
+\item{\code{original_items (optional)}}{(ONLY returns if \code{keep.org} is \code{TRUE}) The original sample generated.}
 }
 }
 \description{

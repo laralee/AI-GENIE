@@ -9,8 +9,9 @@ run_pipeline(
   openai.key,
   title = "Networks Before and After AI-Genie",
   EGA_model = NULL,
-  keep.org,
+  keep.org = FALSE,
   plot = TRUE,
+  plot.stability = FALSE,
   silently = FALSE,
   ...
 )
@@ -28,6 +29,8 @@ run_pipeline(
 
 \item{plot}{Logical; if \code{TRUE}, displays the network plots. Defaults to \code{TRUE}.}
 
+\item{plot.stability}{Logical; Specifies whether to display the secondary network stability plots. Defaults to \code{FALSE}.}
+
 \item{silently}{Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.}
 
 \item{...}{Additional arguments passed to underlying functions.}
@@ -35,17 +38,19 @@ run_pipeline(
 \value{
 A list containing:
 \describe{
-\item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction.}
-\item{\code{initial_EGA}}{The initial Exploratory Graph Analysis (EGA) object.}
-\item{\code{final_EGA}}{The final EGA object after reduction.}
+\item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.}
+\item{\code{final_ega_obj}}{The final EGA object after reduction.}
+\item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
+\item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
+\item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 \item{\code{embeddings}}{The embeddings generated for the items.}
-\item{\code{embedding_type}}{The type of embeddings used (\code{"sparse"} or \code{"full"}).}
-\item{\code{selected_model}}{The EGA model selected based on NMI (\code{"tmfg"} or \code{"glasso"}).}
+\item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
+\item{\code{selected_model}}{The EGA model used throughout the pipeline.}
 \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
 \item{\code{start_nmi}}{The NMI of the original item pool.}
 \item{\code{start_N}}{The starting sample size (number of items).}
 \item{\code{final_N}}{The final sample size after reduction.}
-\item{\code{original_items}}{(Optional) The original items provided, included if \code{keep.org = TRUE}.}
+\item{\code{original_items (optional)}}{(ONLY returns if \code{keep.org} is \code{TRUE}) The original sample generated.}
 }
 }
 \description{

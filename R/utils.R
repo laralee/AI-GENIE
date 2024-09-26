@@ -307,26 +307,29 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #' @param EGA_model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results. Defaults to \code{FALSE}.
 #' @param plot Logical; if \code{TRUE}, displays the network plots. Defaults to \code{TRUE}.
+#' @param plot.stability Logical; Specifies whether to display the secondary network stability plots. Defaults to \code{FALSE}.
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing:
 #' \describe{
-#'   \item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction.}
-#'   \item{\code{initial_EGA}}{The initial Exploratory Graph Analysis (EGA) object.}
-#'   \item{\code{final_EGA}}{The final EGA object after reduction.}
+#'   \item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns `ID`, `type`, `statement`, and `EGA_communities`.}
+#'   \item{\code{final_ega_obj}}{The final EGA object after reduction.}
+#'   \item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
+#'   \item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
+#'   \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 #'   \item{\code{embeddings}}{The embeddings generated for the items.}
-#'   \item{\code{embedding_type}}{The type of embeddings used (\code{"sparse"} or \code{"full"}).}
-#'   \item{\code{selected_model}}{The EGA model selected based on NMI (\code{"tmfg"} or \code{"glasso"}).}
+#'   \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
+#'   \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
 #'   \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
 #'   \item{\code{start_nmi}}{The NMI of the original item pool.}
 #'   \item{\code{start_N}}{The starting sample size (number of items).}
 #'   \item{\code{final_N}}{The final sample size after reduction.}
-#'   \item{\code{original_items}}{(Optional) The original items provided, included if \code{keep.org = TRUE}.}
+#'   \item{\code{original_items (optional)}}{(ONLY returns if `keep.org` is `TRUE`) The original sample generated.}
 #' }
 run_pipeline <- function(items, openai.key,
                          title = "Networks Before and After AI-Genie",
-                         EGA_model= NULL, keep.org,
-                         plot = TRUE, silently = FALSE, ...){
+                         EGA_model= NULL, keep.org = FALSE,
+                         plot = TRUE, plot.stability = FALSE, silently = FALSE, ...){
 
   ## Get results
   results <- get_results(items=items, EGA_model=EGA_model, openai.key = openai.key, silently = silently)
@@ -336,16 +339,28 @@ run_pipeline <- function(items, openai.key,
   cat(" Done.")
   cat("\n")}
 
-  p1 <- results[["initial_ega_obj"]]
-  p2 <- results[["final_ega_obj"]]
 
-
-
-  plot_networks <- plot_networks(p1, p2, results[["nmi"]], results[["start_nmi"]], title)
 
     if(plot){
+      p1 <- results[["initial_ega_obj"]]
+      p2 <- results[["final_ega_obj"]]
+
+      plot_stability <- plot_networks(p1, p2, "Before AI-GENIE Network", "After AI-GENIE Network",
+                                      results[["nmi"]], results[["start_nmi"]], title)
     plot(plot_networks)
     }
+
+  if(plot.stability){
+    p1 <- results[["initial_bootega_obj"]]
+    p2 <- results[["final_bootega_obj"]]
+
+    nmi_start <- as.numeric(attributes(results[["main_result"]])$methods[["after_uva"]])
+
+    ident <- ifelse(attributes(results[["main_result"]])$methods[["bootega_count"]] == "1",  TRUE, FALSE)
+    plot_stability <- plot_networks(p1, p2, "Before BootEGA Step", "After BootEGA Step",
+                                    results[["nmi"]], nmi_start, title, ident)
+    plot(plot_stability)
+  }
 
   if(!silently){
   print_results(results)
@@ -363,18 +378,21 @@ run_pipeline <- function(items, openai.key,
 #'
 #' Creates a combined plot of the initial and final network structures before and after AI-GENIE reduction, including NMI values and a change subtitle.
 #'
-#' @param p1 An EGA object representing the initial network structure.
-#' @param p2 An EGA object representing the final network structure after AI-GENIE reduction.
+#' @param p1 An EGA object representing the initial network structure (or stability).
+#' @param p2 An EGA object representing the final network structure after AI-GENIE reduction (or stability).
 #' @param nmi2 Numeric; the Normalized Mutual Information (NMI) of the final item pool.
-#' @param nmi1 Numeric; the NMI of the original item pool.
+#' @param nmi1 Numeric; the NMI of the original item pool (or the item pool that was redundancy reduced, in the case of item stability).
 #' @param scale.title A character string specifying the title for the combined plot.
+#' @param ident Logical; specifies if the two bootEGA objects are the same (i.e., if there was only one round of bootEGA). Defaults to \code{FALSE}
 #' @return A combined plot object displaying the initial and final networks with captions and annotations.
-plot_networks <- function(p1, p2, nmi2, nmi1, scale.title){
+plot_networks <- function(p1, p2, cap1, cap2, nmi2, nmi1, scale.title, ident=FALSE){
+
+  if(!ident){
   plot1 <- plot(p1) +
-    labs(caption = paste0("Before AI-Genie. NMI: ", round(nmi1,4) * 100, "%"))
+    labs(caption = paste0(cap1," (NMI: ", round(nmi1,4) * 100, "%)"))
 
   plot2 <- plot(p2) +
-    labs(caption = paste0("After AI-Genie. NMI: ", round(nmi2,4) * 100, "%"))
+    labs(caption = paste0(cap2," (NMI: ", round(nmi2,4) * 100, "%)"))
 
   combined_plot <- plot1 + plot2 +
     plot_annotation(
@@ -387,10 +405,22 @@ plot_networks <- function(p1, p2, nmi2, nmi1, scale.title){
     )
 
 
-  return(combined_plot)
+  return(combined_plot)}
+  else{
+    plot1 <- plot(p1) +
+      labs(caption = paste0("No BootEGA Reduction - Only One Stability Plot Shown. (Final NMI:", round(nmi2,4) * 100, "%)")) +
+      plot_annotation(
+        title = "Stability Plot for Final Item Pool",
+        subtitle = scale.title,
+        theme = theme(
+          plot.title = element_text(hjust = 0.5, size = 16),
+          plot.subtitle = element_text(hjust = 0.5, size = 10)
+        ))
+
+    return(plot1)
+
+  }
 }
-
-
 
 
 

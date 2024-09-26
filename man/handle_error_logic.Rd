@@ -22,9 +22,9 @@ handle_error_logic(
 
 \item{current_label}{Character; the label of the current item type being processed. Optional.}
 
-\item{max_consecutive_errors}{Integer; the maximum number of allowed consecutive errors/no new items before stopping. Defaults to \code{5}.}
+\item{max_consecutive_errors}{Integer; the maximum number of allowed consecutive errors/no new items before stopping. Defaults to \code{10}.}
 
-\item{min_unique_items}{Integer; the minimum number of unique items required to continue. Defaults to \code{10}.}
+\item{min_unique_items}{Integer; the minimum number of unique items required to continue. Defaults to \code{3}.}
 }
 \value{
 Logical; returns \code{TRUE} to continue the generation process, or \code{FALSE} to stop.
