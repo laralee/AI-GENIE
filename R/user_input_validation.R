@@ -21,7 +21,7 @@
 #' @param top.p Numeric; controls the diversity of the model's output.
 #' @param items.only Logical; if \code{TRUE}, only items are generated without further analysis.
 #' @param adaptive Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items.
-#' @param EGA_model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results.
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
 #' @param plot.stability Logical; Specifies whether to display the secondary network stability plots.
@@ -31,14 +31,14 @@
 AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
                            user.prompts, item.type.definitions, cleaning.fun, system.role,
                            scale.title, sub.domain, model, item.examples,
-                           target.N, temperature, top.p, items.only, adaptive, EGA_model,
+                           target.N, temperature, top.p, items.only, adaptive, EGA.model,
                            keep.org, plot, plot.stability, silently, ...) {
 
   # Check for missing arguments (no NA values)
   check_no_na(item.attributes, openai.API, groq.API, custom,
               user.prompts, item.type.definitions, cleaning.fun, system.role,
               scale.title, sub.domain, model, item.examples,
-              target.N, temperature, top.p, items.only, adaptive, EGA_model, keep.org,
+              target.N, temperature, top.p, items.only, adaptive, EGA.model, keep.org,
               plot, plot.stability, silently)
 
   # Validate that 'silently' is a boolean
@@ -66,8 +66,8 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
     stop("'plot.stability' must be a boolean.")
   }
 
-  # Validate EGA_model
-  validate_EGA_model(EGA_model)
+  # Validate EGA.model
+  validate_EGA_model(EGA.model)
 
   # Validate scale.title and sub.domain
   scale.title <- validate_title_or_domain(scale.title, "scale title")
@@ -120,7 +120,7 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
     item.attributes=item.attributes, openai.API=openai.API, groq.API=groq.API, custom=custom,
     user.prompts=user.prompts, item.type.definitions=item.type.definitions, cleaning.fun=cleaning.fun,
     system.role=system.role, scale.title=scale.title, sub.domain=sub.domain, model=model, item.examples=item.examples,
-    target.N=target.N, temperature=temperature, top.p=top.p, items.only=items.only, adaptive=adaptive, EGA_model=EGA_model,
+    target.N=target.N, temperature=temperature, top.p=top.p, items.only=items.only, adaptive=adaptive, EGA.model=EGA.model,
     keep.org=keep.org, plot=plot, silently=silently
     ))
 }
@@ -139,7 +139,7 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #'
 #' @param item.data A required data frame containing your item statements and item type labels.
 #' @param openai.API A required character string of your OpenAI API key.
-#' @param EGA_model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @return A list containing:
@@ -147,14 +147,14 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #'   \item{\code{items}}{A cleaned and validated data frame of your item data.}
 #'   \item{\code{openai.API}}{Your validated OpenAI API key.}
 #' }
-GENIE_checks <- function(item.data, openai.API, EGA_model, plot, silently) {
+GENIE_checks <- function(item.data, openai.API, EGA.model, plot, silently) {
 
-  check_no_na(item.data, openai.API, plot, silently, EGA_model)
+  check_no_na(item.data, openai.API, plot, silently, EGA.model)
 
   # quickly validate booleans
   if(!(plot==FALSE || plot==TRUE)){stop("'plot' must be a boolean.")}
   if(!(silently==FALSE || silently==TRUE)){stop("'silently' must be a boolean.")}
-  validate_EGA_model(EGA_model)
+  validate_EGA_model(EGA.model)
 
   # validate the API
   openai.API <- validate_openai(openai.API)

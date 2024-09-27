@@ -23,7 +23,7 @@
 #' @param top.p Numeric; defaults to `1`. A value between `0` and `1` setting the top-p parameter of the language model.
 #' @param items.only Logical; defaults to `FALSE`. Set to `TRUE` if you only want the items generated without further processing. When `TRUE`, item pool reduction through AI-GENIE is skipped, and the function returns a data frame of the generated items.
 #' @param adaptive Logical; defaults to `TRUE`. Indicates whether to use an adaptive prompting approach (recommended). When `TRUE`, the language model receives a list of previously generated items to avoid redundancy. Set to `FALSE` to skip this step if context length is a concern.
-#' @param EGA_model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
+#' @param EGA.model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
 #' @param keep.org Logical; defaults to `FALSE`. When `TRUE`, returns a data frame of the original item pool.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display the main summary network plots.
 #' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
@@ -197,7 +197,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
                     cleaning.fun = NULL, system.role = NULL,
                     scale.title = NULL, sub.domain = NULL, model = "gpt3.5", item.examples = NULL,
                     target.N = 100, temperature = 1, top.p = 1, items.only = FALSE, adaptive = TRUE,
-                    EGA_model = "tmfg", keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
+                    EGA.model = "tmfg", keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
                     silently = FALSE, ...) {
 
   # Perform input validation
@@ -219,7 +219,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
     top.p = top.p,
     items.only = items.only,
     adaptive = adaptive,
-    EGA_model = EGA_model,
+    EGA.model = EGA.model,
     keep.org = keep.org,
     plot = plot,
     plot.stability = plot.stability,
@@ -258,7 +258,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
     items = generated_items,
     openai.key = validated_params$openai.API,
     title = scale.title,
-    EGA_model = EGA_model,
+    EGA.model = EGA.model,
     keep.org = keep.org,
     plot = plot,
     plot.stability = plot.stability,
@@ -280,7 +280,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #'
 #' @param items A required data frame containing your item statements and item type labels. The data frame should have two columns: one containing the item statements and one containing the item type labels. The column names do not need to be specific; the function will determine which column contains the item statements and which contains the item type labels. There must be at least two distinct item types which each contain at least 15 items. The total number of unique items should be at least 50.
 #' @param openai.API A required character string of your OpenAI API key.
-#' @param EGA_model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
+#' @param EGA.model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display summary network plots.
 #' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
 #' @param silently Logical; defaults to `FALSE`. When `TRUE`, suppresses console output.
@@ -389,16 +389,16 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #' # View the final item pool
 #' View(my.personality.inventory.results$main_result)
 #' }
-GENIE <- function(items, openai.API, EGA_model="tmfg", plot=TRUE, plot.stability = FALSE, silently=FALSE, ...) {
+GENIE <- function(items, openai.API, EGA.model="tmfg", plot=TRUE, plot.stability = FALSE, silently=FALSE, ...) {
 
   # check the user-provided items
-  checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA_model=EGA_model,
+  checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA.model=EGA.model,
                          plot=plot, silently=silently)
   openai.API <- checks[["openai.API"]]
   items <- checks[["items"]]
 
   # run the pipeline
-  run_pipeline <- run_pipeline(items = items, EGA_model = EGA_model,openai.key=openai.API,
+  run_pipeline <- run_pipeline(items = items, EGA.model = EGA.model,openai.key=openai.API,
                                labels = items$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
                                silently= silently)
 

@@ -344,12 +344,12 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
 #' Runs the AI-GENIE reduction analysis pipeline, including embeddings generation, redundancy removal using Unique Variable Analysis (UVA), instability removal, and EGA model selection based on Normalized Mutual Information (NMI).
 #'
 #' @param items A data frame containing the item statements and types.
-#' @param EGA_model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
+#' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
 #' @param openai.key A character string of your OpenAI API key.
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
-get_results <- function(items, EGA_model, openai.key, silently, ...) {
+get_results <- function(items, EGA.model, openai.key, silently, ...) {
 
   # Define the possible models
   possible_models <- c("tmfg", "glasso")
@@ -369,20 +369,20 @@ get_results <- function(items, EGA_model, openai.key, silently, ...) {
   # Initialize a list to store results
   results <- list()
 
-  # If EGA_model is specified, evaluate only that model
-  if (!is.null(EGA_model)) {
+  # If EGA.model is specified, evaluate only that model
+  if (!is.null(EGA.model)) {
 
-    results[[EGA_model]] <- compute_EGA(items=items, EGA_model = EGA_model,
+    results[[EGA.model]] <- compute_EGA(items=items, EGA.model = EGA.model,
                                         embedding = embedding, openai.key = openai.key,
                                         silently = silently)
 
-    chosen_model <- EGA_model
-    chosen_result <- results[[EGA_model]]
+    chosen_model <- EGA.model
+    chosen_result <- results[[EGA.model]]
 
   } else {
-    # If EGA_model is not specified, evaluate both models and select the best
+    # If EGA.model is not specified, evaluate both models and select the best
     for (model in possible_models) {
-      results[[model]] <- compute_EGA(items=items, EGA_model = model,
+      results[[model]] <- compute_EGA(items=items, EGA.model = model,
                                       embedding = embedding, openai.key = openai.key,
                                       silently = silently)
     }
@@ -443,7 +443,7 @@ flatten_text <- function(text)
 #' @param obj A list object containing the analysis results returned by \code{get_results}.
 #' @return No return value; the function prints the results to the console.
 print_results<-function(obj){
-  ega_model <- obj[["selected_model"]]
+  EGA.model <- obj[["selected_model"]]
   before_nmi <- obj[["start_nmi"]]
   embedding_type <- obj[["embedding_type"]]
   after_genie <- obj[["nmi"]]
@@ -456,7 +456,7 @@ print_results<-function(obj){
   cat("\n")
   cat("                          ----------------")
   cat("\n")
-  cat(paste("EGA Model:", ega_model,"    Embeddings Used:", embedding_type,
+  cat(paste("EGA Model:", EGA.model,"    Embeddings Used:", embedding_type,
             "    Staring N:", initial_items, "    Final N:", final_items))
   cat("\n")
   cat(paste0("             Initial NMI: ", round(before_nmi,4) * 100, "%",
@@ -472,16 +472,16 @@ print_results<-function(obj){
 #' Computes the Exploratory Graph Analysis (EGA) steps using the specified EGA model. This function performs initial EGA, removes redundancies using Unique Variable Analysis (UVA), removes instabilities, and computes Normalized Mutual Information (NMI) values before and after AI-GENIE reduction.
 #'
 #' @param items A data frame containing the item statements and types.
-#' @param EGA_model A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.model A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
 #' @param embedding A matrix of embeddings for the items.
 #' @param openai.key A character string of your OpenAI API key.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, final and initial EGA and bootEGA objects, embeddings, NMI values, and item counts before and after reduction.
-compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) {
+compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) {
   if(!silently){
     cat("\n")
-    cat(paste0("Computing EGA steps using ", EGA_model, "..."))
+    cat(paste0("Computing EGA steps using ", EGA.model, "..."))
   }
 
   # Assign unique IDs
@@ -496,7 +496,7 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
   # Before AI-GENIE
   temp <- colnames(embedding)
   colnames(embedding) <- items$ID
-  before_ega <- EGA.fit(data=embedding, model = EGA_model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  before_ega <- EGA.fit(data=embedding, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
   colnames(embedding) <- temp
 
   # Compute NMI before AI-GENIE
@@ -519,14 +519,14 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
   # Removes a count due to going back a previous step if entering the 'while' loop
 
   ### Sparse embedding
-  after_red_sparse <- EGA.fit(data=unique_items, model = EGA_model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  after_red_sparse <- EGA.fit(data=unique_items, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
   after_red_sparse_nmi <- igraph::compare(
     comm1=truth[colnames(unique_items)], comm2=after_red_sparse$wc, method = "nmi"
   )
 
   ### Full embedding
   unique_items_full <- embedding[, colnames(unique_items)]
-  after_red_full <- EGA.fit(data=unique_items_full, model = EGA_model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  after_red_full <- EGA.fit(data=unique_items_full, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
   after_red_full_nmi <- igraph::compare(
     comm1=truth[colnames(unique_items)], comm2=after_red_full$wc, method = "nmi"
   )
@@ -546,12 +546,12 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
 
   tryCatch(
   boot_res <- remove_instabilities(items=unique_items,
-                                   model = EGA_model, EGA.type = "EGA.fit", verbose = FALSE),
+                                   model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE),
   error = function(e) {
     if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
       cat(" ...BootEGA failed. Trying new seed...")
       boot_res <- remove_instabilities(items=unique_items,
-                                       model = EGA_model, EGA.type = "EGA.fit", verbose = FALSE,
+                                       model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE,
                                        seed=sample(1:1000, 1))
     } else {
       stop(e)
@@ -571,7 +571,7 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
   ## Final EGA
   temp <- colnames(item_set)
   colnames(item_set) <- items$ID[items$statement %in% temp]
-  final_ega <- EGA.fit(data=item_set, model = EGA_model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  final_ega <- EGA.fit(data=item_set, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
   colnames(item_set) <- temp
 
   # Compute NMI after AI-GENIE
@@ -595,7 +595,7 @@ compute_EGA <- function(items, EGA_model, embedding, openai.key, silently, ...) 
 
   # Attach results as attributes
   attr(result, "methods") <- c(
-    ega_model = EGA_model,
+    ega_model = EGA.model,
     before_nmi = before_nmi,
     embedding = chosen_embedding_type,
     after_uva = chosen_nmi,

@@ -4,14 +4,14 @@
 \alias{GENIE_checks}
 \title{GENIE Input Validation}
 \usage{
-GENIE_checks(item.data, openai.API, EGA_model, plot, silently)
+GENIE_checks(item.data, openai.API, EGA.model, plot, silently)
 }
 \arguments{
 \item{item.data}{A required data frame containing your item statements and item type labels.}
 
 \item{openai.API}{A required character string of your OpenAI API key.}
 
-\item{EGA_model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
+\item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
 
 \item{plot}{Logical; if \code{TRUE}, displays the network plots.}
 

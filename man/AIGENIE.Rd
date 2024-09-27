@@ -22,7 +22,7 @@ AIGENIE(
   top.p = 1,
   items.only = FALSE,
   adaptive = TRUE,
-  EGA_model = "tmfg",
+  EGA.model = "tmfg",
   keep.org = FALSE,
   plot = TRUE,
   plot.stability = FALSE,
@@ -65,7 +65,7 @@ AIGENIE(
 
 \item{adaptive}{Logical; defaults to \code{TRUE}. Indicates whether to use an adaptive prompting approach (recommended). When \code{TRUE}, the language model receives a list of previously generated items to avoid redundancy. Set to \code{FALSE} to skip this step if context length is a concern.}
 
-\item{EGA_model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
+\item{EGA.model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
 
 \item{keep.org}{Logical; defaults to \code{FALSE}. When \code{TRUE}, returns a data frame of the original item pool.}
 

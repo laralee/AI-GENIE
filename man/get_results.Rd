@@ -4,12 +4,12 @@
 \alias{get_results}
 \title{Get Results}
 \usage{
-get_results(items, EGA_model, openai.key, silently, ...)
+get_results(items, EGA.model, openai.key, silently, ...)
 }
 \arguments{
 \item{items}{A data frame containing the item statements and types.}
 
-\item{EGA_model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
+\item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
 
 \item{openai.key}{A character string of your OpenAI API key.}
 

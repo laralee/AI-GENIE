@@ -4,12 +4,12 @@
 \alias{compute_EGA}
 \title{Compute EGA}
 \usage{
-compute_EGA(items, EGA_model, embedding, openai.key, silently, ...)
+compute_EGA(items, EGA.model, embedding, openai.key, silently, ...)
 }
 \arguments{
 \item{items}{A data frame containing the item statements and types.}
 
-\item{EGA_model}{A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
+\item{EGA.model}{A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
 
 \item{embedding}{A matrix of embeddings for the items.}
 

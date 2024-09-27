@@ -8,7 +8,7 @@ run_pipeline(
   items,
   openai.key,
   title = "Networks Before and After AI-Genie",
-  EGA_model = NULL,
+  EGA.model = NULL,
   keep.org = FALSE,
   plot = TRUE,
   plot.stability = FALSE,
@@ -23,7 +23,7 @@ run_pipeline(
 
 \item{title}{An optional character string specifying the title for the network plots. Defaults to \code{"Networks Before and After AI-Genie"}.}
 
-\item{EGA_model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
+\item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
 
 \item{keep.org}{Logical; if \code{TRUE}, includes the original items in the returned results. Defaults to \code{FALSE}.}
 

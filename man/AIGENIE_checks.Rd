@@ -22,7 +22,7 @@ AIGENIE_checks(
   top.p,
   items.only,
   adaptive,
-  EGA_model,
+  EGA.model,
   keep.org,
   plot,
   plot.stability,
@@ -65,7 +65,7 @@ AIGENIE_checks(
 
 \item{adaptive}{Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items.}
 
-\item{EGA_model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
+\item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
 
 \item{keep.org}{Logical; if \code{TRUE}, includes the original items in the returned results.}
 

@@ -7,7 +7,7 @@
 GENIE(
   items,
   openai.API,
-  EGA_model = "tmfg",
+  EGA.model = "tmfg",
   plot = TRUE,
   plot.stability = FALSE,
   silently = FALSE,
@@ -19,7 +19,7 @@ GENIE(
 
 \item{openai.API}{A required character string of your OpenAI API key.}
 
-\item{EGA_model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
+\item{EGA.model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
 
 \item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display summary network plots.}
 

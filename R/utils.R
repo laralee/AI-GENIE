@@ -304,7 +304,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #' @param items A data frame containing the item statements and types.
 #' @param openai.key A character string of your OpenAI API key.
 #' @param title An optional character string specifying the title for the network plots. Defaults to \code{"Networks Before and After AI-Genie"}.
-#' @param EGA_model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
+#' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results. Defaults to \code{FALSE}.
 #' @param plot Logical; if \code{TRUE}, displays the network plots. Defaults to \code{TRUE}.
 #' @param plot.stability Logical; Specifies whether to display the secondary network stability plots. Defaults to \code{FALSE}.
@@ -328,11 +328,11 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #' }
 run_pipeline <- function(items, openai.key,
                          title = "Networks Before and After AI-Genie",
-                         EGA_model= NULL, keep.org = FALSE,
+                         EGA.model= NULL, keep.org = FALSE,
                          plot = TRUE, plot.stability = FALSE, silently = FALSE, ...){
 
   ## Get results
-  results <- get_results(items=items, EGA_model=EGA_model, openai.key = openai.key, silently = silently)
+  results <- get_results(items=items, EGA.model=EGA.model, openai.key = openai.key, silently = silently)
 
   if(!silently){
   flush.console()

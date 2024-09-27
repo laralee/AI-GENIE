@@ -240,14 +240,14 @@ validate_target_N <- function(target.N, labels, items.only) {
 
 #' Validate EGA Model
 #'
-#' Validates the \code{EGA_model} parameter to ensure it is either \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.
+#' Validates the \code{EGA.model} parameter to ensure it is either \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.
 #'
-#' @param EGA_model A character string specifying the model to be used with EGA, one of \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.
+#' @param EGA.model A character string specifying the model to be used with EGA, one of \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.
 #' @return No return value; the function stops with an error message if validation fails.
-validate_EGA_model <- function(EGA_model){
-  if(!is.null(EGA_model)){
-    if(EGA_model != "tmfg" && EGA_model != "glasso"){
-      stop("EGA_model must either be 'tmfg', 'glasso', or NULL.")
+validate_EGA_model <- function(EGA.model){
+  if(!is.null(EGA.model)){
+    if(EGA.model != "tmfg" && EGA.model != "glasso"){
+      stop("EGA.model must either be 'tmfg', 'glasso', or NULL.")
     }
   }
 }
