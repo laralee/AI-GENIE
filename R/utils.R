@@ -207,7 +207,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             stop(e)
           }}
         )
-        cleaned_items <- validate_return_object(output)
+        cleaned_items <- validate_return_object(output, current_label)
         current_items_df <- data.frame(type=rep(current_label, length(cleaned_items)),
                                        statement=cleaned_items)
       }
