@@ -191,9 +191,9 @@ GENIE_checks <- function(item.data, openai.API, EGA.model, plot, silently) {
 #' Validates the output of the user-provided text cleaning function (\code{cleaning.fun}) to ensure it returns a list of cleaned items. This function checks that the output is a list of character strings, contains no missing or empty values, and correctly formats the item data by associating each item with its corresponding type.
 #'
 #' @param output The output object returned by the user-provided \code{cleaning.fun} function.
-#' @param current_label Character; the current item type label being processed.
-#' @return A character vector of cleaned item statements.
-validate_return_object <- function(output, current_label) {
+#' @param n_empty The number of times the cleaning function failed to return any valid items
+#' @return A list containing the character vector of cleaned item statements and the number of items the cleaning function failed to return viable output consecutively.
+validate_return_object <- function(output, n_empty) {
   string <- "the output of the provided text cleaning function"
 
   # Check if output is a list
@@ -212,11 +212,19 @@ validate_return_object <- function(output, current_label) {
   # Remove any NA or empty strings
   items <- items[!is.na(items) & items != ""]
 
-  if (length(items) == 0) {
-    stop(paste("No valid items were returned by the cleaning function for item type:", current_label))
+  if (length(items) == 0 && n_empty < 5) {
+    n_empty <- n_empty + 1
+  } else if (length(items) > 0){
+    n_empty <- 0
   }
 
-  return(items)
+  if (n_empty >= 5){
+    stop("No valid items were returned by the cleaning function after 5 consecutive attempts. Check function logic.")
+  }
+
+
+
+  return(list(items=items, n_empty=n_empty))
 }
 
 

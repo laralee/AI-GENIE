@@ -93,6 +93,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
     error_count <- 0
     consecutive_no_new_items <- 0
+    n_empty <- 0
     last_error_message <- NULL
 
     while (length(unique_items) < target.N[[i]]) {
@@ -207,7 +208,9 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             stop(e)
           }}
         )
-        cleaned_items <- validate_return_object(output, current_label)
+        validate_output <- validate_return_object(output, n_empty)
+        cleaned_items <- validate_output[["items"]]
+        n_empty <- validate_output[["n_empty"]]
         current_items_df <- data.frame(type=rep(current_label, length(cleaned_items)),
                                        statement=cleaned_items)
       }
