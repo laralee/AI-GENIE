@@ -421,6 +421,8 @@ run_pipeline <- function(items, openai.key,
 
   item_level_results[[item_type]] <- results
   }
+  #plots <- plot_all(item_level_results)
+  #plot(plots[["network_plot"]])
 
   if(!silently){
   cat("\n")
@@ -510,15 +512,15 @@ plot_networks <- function(p1, p2, caption1, caption2, nmi2, nmi1, scale.title, i
 
   if(!ident){
   plot1 <- plot(p1) +
-    labs(caption = paste0(caption1," (NMI: ", round(nmi1,4) * 100, "%)"))
+    labs(caption = paste0(caption1," (NMI: ", round(nmi1,4) * 100, ")"))
 
   plot2 <- plot(p2) +
-    labs(caption = paste0(caption2," (NMI: ", round(nmi2,4) * 100, "%)"))
+    labs(caption = paste0(caption2," (NMI: ", round(nmi2,4) * 100, ")"))
 
   combined_plot <- plot1 + plot2 +
     plot_annotation(
       title = scale.title,
-      subtitle = paste0("Change in NMI: ", round((nmi2 - nmi1),4) * 100, "%"),
+      subtitle = paste0("Change in NMI: ", round((nmi2 - nmi1),4) * 100),
       theme = theme(
         plot.title = element_text(hjust = 0.5, size = 16),
         plot.subtitle = element_text(hjust = 0.5, size = 12)
@@ -529,7 +531,7 @@ plot_networks <- function(p1, p2, caption1, caption2, nmi2, nmi1, scale.title, i
 }
   else{
     plot1 <- plot(p1) +
-      labs(caption = paste0("No BootEGA Reduction - Stability Plot for All Items (", round(nmi2,4) * 100, "%)"))
+      labs(caption = paste0("No BootEGA Reduction - Stability Plot for All Items (", round(nmi2,4) * 100, ")"))
 
     combined_plot <- plot1 +
       plot_annotation(

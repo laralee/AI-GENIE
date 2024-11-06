@@ -209,7 +209,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
                     cleaning.fun = NULL, system.role = NULL,
                     scale.title = NULL, sub.domain = NULL, model = "gpt3.5", item.examples = NULL,
                     target.N = 100, temperature = 1, top.p = 1, items.only = FALSE, adaptive = TRUE,
-                    EGA.model = "tmfg", keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
+                    EGA.model = NULL, keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
                     calc.final.stability = FALSE, silently = FALSE, ...) {
 
   # Perform input validation
@@ -413,7 +413,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' # View the final item pool
 #' View(my.personality.inventory.results$main_result)
 #' }
-GENIE <- function(items, item.attributes, openai.API, EGA.model="tmfg", plot=TRUE, plot.stability = FALSE, calc.final.stability=FALSE, silently=FALSE, ...) {
+GENIE <- function(items, item.attributes, openai.API, EGA.model=NULL, plot=TRUE, plot.stability = FALSE, calc.final.stability=FALSE, silently=FALSE, ...) {
 
   # check the user-provided items
   checks <- GENIE_checks(item.data=items, item.attributes= item.attributes, openai.API=openai.API, EGA.model=EGA.model,
@@ -425,7 +425,7 @@ GENIE <- function(items, item.attributes, openai.API, EGA.model="tmfg", plot=TRU
   # run the pipeline
   run_pipeline <- run_pipeline(items = items, EGA.model = EGA.model,openai.key=openai.API,
                                labels = items$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
-                               silently= silently)
+                               silently= silently, calc.final.stability = calc.final.stability)
 
   return(run_pipeline)
 

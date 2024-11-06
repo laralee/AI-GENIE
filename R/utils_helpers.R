@@ -300,14 +300,14 @@ remove_redundancies <- function(embedding, ...)
 #' @param cut.off Numeric; the stability cutoff value. Defaults to \code{0.75}.
 #' @param ... Additional arguments passed to the \code{\link[EGAnet]{bootEGA}} function.
 #' @return A data matrix or data frame with unstable items removed.
-remove_instabilities <- function(items, cut.off = 0.75, ...)
+remove_instabilities <- function(items, cut.off = 0.75,...)
 {
 
   # Set counter
   count <- 1
 
   # BootEGA
-  bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, ...)
+  bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE)
   boot1 <- bootstrap
 
   current_boot <- NULL
@@ -324,7 +324,7 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
 
     # BootEGA
     bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, seed = 123,
-                                 plot.itemStability = FALSE, ...)
+                                 plot.itemStability = FALSE)
 
     current_boot <- bootstrap
   }
@@ -477,8 +477,8 @@ print_results<-function(obj){
   cat(paste("EGA Model:", EGA.model,"    Embeddings Used:", embedding_type,
             "    Staring N:", initial_items, "    Final N:", final_items))
   cat("\n")
-  cat(paste0("             Initial NMI: ", round(before_nmi,4) * 100, "%",
-             "           Final NMI: ", round(after_genie,4) * 100, "%"))
+  cat(paste0("             Initial NMI: ", round(before_nmi,4) * 100,
+             "           Final NMI: ", round(after_genie,4) * 100))
   cat("\n")
   cat("\n")
 }
@@ -701,194 +701,122 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
   full_items <- data.frame("ID"= as.factor(1:nrow(items)),
                            "statement"= items$statement)
 
-  ## Get truth
-  truth <- as.numeric(factor(tolower(truth)))
-  names(truth) <- items$statement
+  # Get truth for the reduced set
+  truth_reduced <- as.numeric(factor(tolower(truth_reduced)))
+  names(truth_reduced) <- items_reduced$statement
 
-  # Sparsify embeddings
+  # Sparsify reduced embeddings
+  embedding_reduced_sparse <- as.matrix(embedding_reduced)
+  percentiles <- quantile(embedding_reduced_sparse, probs = c(0.025, 0.975))
+  embedding_reduced_sparse[embedding_reduced_sparse > percentiles[1] & embedding_reduced_sparse < percentiles[2]] <- 0
 
-  embedding_sparse <- as.matrix(embedding)
-  percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
-  embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
-
-
-  # Determine which EGA model and embedding type is the best given the data
-  if(!silently){
-    cat("\n")
-    cat("Building initial EGA network... ")
+  # Show progress
+  if(!silently) {
+    cat("\nOptimizing based on the final EGA network...\n")
   }
 
   best_nmi <- 0
   if(is.null(EGA.model)) {
     for (model_type in c("tmfg", "glasso")) {
       for (use.full in c(TRUE, FALSE)) {
-        # Set embedding based on use.full
-        embedding_use <- if (use.full) embedding else embedding_sparse
-
-        # Temporarily change column names
+        embedding_use <- if (use.full) embedding_reduced else embedding_reduced_sparse
         temp <- colnames(embedding_use)
-        colnames(embedding_use) <- items$ID
+        colnames(embedding_use) <- items_reduced$ID
 
         # Run EGA and calculate NMI
-        before_ega <- EGA.fit(data = embedding_use, model = model_type, plot.EGA = FALSE, verbose = FALSE)$EGA
+        final_ega <- EGA.fit(data = embedding_use, model = model_type, plot.EGA = FALSE, verbose = FALSE)$EGA
         colnames(embedding_use) <- temp  # Restore original column names
-        before_nmi <- igraph::compare(comm1 = truth, comm2 = before_ega$wc, method = "nmi")
+        final_nmi <- igraph::compare(comm1 = truth_reduced, comm2 = final_ega$wc, method = "nmi")
 
         # Check and update best NMI
-        if (before_nmi > best_nmi) {
+        if (final_nmi > best_nmi) {
           embedding_type <- if (use.full) "full" else "sparse"
           model_used <- model_type
-          best_nmi <- before_nmi
-          best_before_ega <- before_ega
+          best_nmi <- final_nmi
+          best_final_ega <- final_ega
         }
       }
     }
   } else {
     for (use.full in c(TRUE, FALSE)) {
-      # Set embedding based on use.full
-      embedding_use <- if (use.full) embedding else embedding_sparse
-
-      # Temporarily change column names
+      embedding_use <- if (use.full) embedding_reduced else embedding_reduced_sparse
       temp <- colnames(embedding_use)
-      colnames(embedding_use) <- items$ID
+      colnames(embedding_use) <- items_reduced$ID
 
-      # Run EGA and calculate NMI
-      before_ega <- EGA.fit(data = embedding_use, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
-      colnames(embedding_use) <- temp  # Restore original column names
-      before_nmi <- igraph::compare(comm1 = truth, comm2 = before_ega$wc, method = "nmi")
+      final_ega <- EGA.fit(data = embedding_use, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+      colnames(embedding_use) <- temp
+      final_nmi <- igraph::compare(comm1 = truth_reduced, comm2 = final_ega$wc, method = "nmi")
 
-      # Check and update best NMI
-      if (before_nmi > best_nmi) {
+      if (final_nmi > best_nmi) {
         embedding_type <- if (use.full) "full" else "sparse"
         model_used <- EGA.model
-        best_nmi <- before_nmi
-        best_before_ega <- before_ega
+        best_nmi <- final_nmi
+        best_final_ega <- final_ega
       }
     }
   }
 
-  # find the initial item stability
-  if(!silently && !calc.final.stability){
-    cat("Done.")
-    cat("\n")
+  # Determine initial stability and network structure based on optimal settings
+  if(!silently) {
+    cat("Final EGA network optimized. Now building initial EGA network based on optimal settings...\n")
   }
 
-  if(calc.final.stability && !silently){
-    cat("Done. Now finding initial stability... ")
-    cat("\n")
-    }
+  # Prepare full embeddings for initial EGA analysis
+  embedding_sparse <- as.matrix(embedding)
+  percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+  embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+
+  embedding_use <- if (embedding_type == "full") embedding else embedding_sparse
+  temp <- colnames(embedding_use)
+  colnames(embedding_use) <- items$ID
+
+  best_before_ega <- EGA.fit(data = embedding_use, model = model_used, plot.EGA = FALSE, verbose = FALSE)$EGA
+  colnames(embedding_use) <- temp
+  best_before_nmi <- igraph::compare(comm1 = truth, comm2 = best_before_ega$wc, method = "nmi")
+
+  # Show progress for stability calculation
+  if(calc.final.stability && !silently) {
+    cat("Done. Now finding final item stability...\n")
+  }
 
   if(calc.final.stability) {
-  if(embedding_type=="full"){
-    embedding_use <- embedding
+    verbose <- !silently
+    bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed = 1234, verbose = verbose)
+
+    embedding_use <- if (embedding_type == "full") embedding_reduced else embedding_reduced_sparse
+    temp <- colnames(embedding_use)
+    colnames(embedding_use) <- items_reduced$ID
+
+    bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed = 1234, verbose = verbose)
+    colnames(embedding_use) <- temp
+
+    if(!silently) {
+      cat("Final stability analysis complete.\n")
+    }
+  }
+
+  # Network plot based on optimized settings
+  network_plot <- plot_networks(p1 = best_before_ega, p2 = best_final_ega, caption1 = "Before AI-GENIE Network",
+                                caption2 = "After AI-GENIE Network", nmi2 = best_nmi,
+                                nmi1 = best_before_nmi, scale.title = title, ident = FALSE)
+
+  if(calc.final.stability) {
+    stability_plot <- plot_networks(p1 = bootstrap1, p2 = bootstrap2, caption1 = "Before AI-GENIE Item Stability",
+                                    caption2 = "After AI-GENIE Item Stability", nmi2 = best_nmi,
+                                    nmi1 = best_before_nmi, scale.title = title, ident = FALSE)
+  }
+
+  # Return result with relevant objects based on stability calculation
+  if(calc.final.stability) {
+    return_obj <- list(final_ega = best_final_ega, before_ega = best_before_ega, before_nmi = best_before_nmi,
+                       final_nmi = best_nmi, items_reduced = items_reduced, initial_bootstrap = bootstrap1,
+                       final_bootstrap = bootstrap2, network_plot = network_plot, stability_plot = stability_plot,
+                       model_used = model_used, embedding_type = embedding_type)
   } else {
-    embedding_use <- embedding_sparse
+    return_obj <- list(final_ega = best_final_ega, before_ega = best_before_ega, before_nmi = best_before_nmi,
+                       final_nmi = best_nmi, items_reduced = items_reduced, network_plot = network_plot,
+                       model_used = model_used, embedding_type = embedding_type)
   }
-
-  if(!silently){
-    verbose <- TRUE
-  } else {
-    verbose <- FALSE
-  }
-
-  bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed=1234, verbose = verbose)
-  if(!silently){
-    cat("Done.")
-  }
-  }
-  # compute final EGA model with the optimal embeddings and model type found
-  if(!silently){
-    cat("Building final EGA network... ")
-  }
-
-  # Sparsify embeddings
-  embedding_reduced_sparse <- as.matrix(embedding_reduced)
-  percentiles <- quantile(embedding_reduced_sparse, probs = c(0.025, 0.975))
-  embedding_reduced_sparse[embedding_reduced_sparse > percentiles[1] & embedding_reduced_sparse < percentiles[2]] <- 0
-
-  if(embedding_type=="full"){
-    embedding_use <- embedding_reduced
-  } else {
-    embedding_use <- embedding_reduced_sparse
-  }
-
-  # Extract unique IDs
-  IDs <- full_items$ID[as.vector(full_items$statement) %in% as.vector(items_reduced$statement)]
-
-  ## Get truth
-  truth <- as.numeric(factor(tolower(truth_reduced)))
-  names(truth) <- colnames(embedding_reduced)
-
-  temp <- colnames(embedding_use)
-  colnames(embedding_use) <- IDs
-  final_ega <- EGA.fit(data=embedding_use, model = model_used, plot.EGA = FALSE, verbose = FALSE)$EGA
-  colnames(embedding_use) <- temp
-  final_nmi <- igraph::compare(comm1 = truth, comm2 = final_ega$wc, method = "nmi")
-
-  items_reduced$ID <- IDs
-  items_reduced$EGA_communities <- as.vector(final_ega$wc)
-
-  if(!silently && !calc.final.stability){
-    cat("Done.")
-    cat("\n")
-  }
-
-  if(!silently && calc.final.stability){
-    cat("Done. Now finding final stability... ")
-    cat("\n")
-  }
-
-  if(calc.final.stability){
-  if(!silently){
-    verbose <- TRUE
-  } else {
-    verbose <- FALSE
-  }
-
-  # Run a stability before vs after
-  bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                                seed = 1234, verbose = verbose)
-
-  if(!silently){
-    cat("Done.")
-  }
-  }
-
-  p1 <- best_before_ega
-  p2 <- final_ega
-
-  network_plot <- plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Network",
-                                caption2 = "After AI-GENIE Network",
-                                nmi2 = final_nmi,
-                                nmi1 = best_nmi,
-                                scale.title = title, ident=FALSE)
-
-  if(calc.final.stability){
-    p1 <- bootstrap1
-    p2 <- bootstrap2
-
-    stability_plot <- plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Item Stability",
-                                  caption2 = "After AI-GENIE Item Stability",
-                                  nmi2 = final_nmi,
-                                  nmi1 = best_nmi,
-                                  scale.title = title, ident=FALSE)
-  }
-
-
-  if(calc.final.stability){
-    return_obj <- list(final_ega=final_ega, before_ega=best_before_ega, before_nmi=best_nmi,
-                       final_nmi=final_nmi, items_reduced = items_reduced,
-                       initial_bootstrap=bootstrap1, final_bootstrap=bootstrap2,
-                       network_plot=network_plot, stability_plot=stability_plot, model_used= model_used,
-                       embedding_type = embedding_type)
-  } else {
-    return_obj <- list(final_ega=final_ega, before_ega=best_before_ega, before_nmi=best_nmi,
-                       final_nmi=final_nmi, items_reduced = items_reduced, network_plot = network_plot,
-                       model_used= model_used, embedding_type = embedding_type)
-  }
-
-
 
   return(return_obj)
 }
-
