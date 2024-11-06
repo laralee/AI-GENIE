@@ -5,7 +5,7 @@
 \title{AI-GENIE}
 \usage{
 AIGENIE(
-  item.attributes = NULL,
+  item.attributes,
   openai.API,
   groq.API = NULL,
   custom = FALSE,
@@ -26,12 +26,13 @@ AIGENIE(
   keep.org = FALSE,
   plot = TRUE,
   plot.stability = FALSE,
+  calc.final.stability = FALSE,
   silently = FALSE,
   ...
 )
 }
 \arguments{
-\item{item.attributes}{(Required when \code{custom = FALSE}) A named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.}
+\item{item.attributes}{A required named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.}
 
 \item{openai.API}{A required character string of your OpenAI API key.}
 
@@ -72,6 +73,8 @@ AIGENIE(
 \item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display the main summary network plots.}
 
 \item{plot.stability}{Logical; defaults to \code{FALSE}. Specifies whether to display the secondary network stability plots.}
+
+\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction. Setting this parameter to \code{TRUE} significantly increases computational expense. Changing this value will NOT change item reduction outcome.}
 
 \item{silently}{Logical; defaults to \code{FALSE}. When \code{TRUE}, suppresses console output.}
 }
@@ -115,9 +118,9 @@ trait.definitions <- list(
 
 # Item attributes
 aspects.of.personality.traits <- list(
-  neuroticism = c("perfectionism", "temperamental", "overthinking"),
-  openness = c("worldly", "artistic", "philosophical", "curious"),
-  extraversion = c("gregarious", "talkative")
+  neuroticism = c("anxious", "depressed", "insecure", "emotional"),
+  openness = c("creative", "perceptual", "curious", "philosophical"),
+  extraversion = c("friendly", "positive", "assertive", "energetic")
 )
 
 # Example items - these should be plain, unformatted, high-quality examples.
@@ -167,29 +170,32 @@ custom.personality.prompts <- list(
 
   # Prompt for generating neuroticism traits
   neuroticism = paste0(
-    "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
+    "Generate NINE unique, psychometrically robust single-statement items designed to assess ",
     "the Big Five personality trait neuroticism. Put EACH item on its own line. ",
-    "Format the items EXACTLY like so: \n<neuroticism>||<item statement>\n",
-    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition. ",
-    "Try to capture as many aspects of the trait neuroticism as you can."
+    "Neuroticism has the following characteristics: perfectionism, temperamental, and overthinking.",
+    "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important.",
+    "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
   ),
 
   # Prompt for generating openness traits
   openness = paste0(
-    "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
+    "Generate TWELVE unique, psychometrically robust single-statement items designed to assess ",
     "the Big Five personality trait openness. Put EACH item on its own line. ",
-    "Format the items EXACTLY like so: \n<openness>||<item statement>\n",
-    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition. ",
-    "Try to capture as many aspects of the trait openness as you can."
+    "Openness has the following characteristics: worldly, artistic, philosophical, and curious.",
+    "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important.",
+    "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
   ),
 
   # Prompt for generating extraversion traits
   extraversion = paste0(
     "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
     "the Big Five personality trait extraversion. Put EACH item on its own line. ",
-    "Format the items EXACTLY like so: \n<extraversion>||<item statement>\n",
-    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition. ",
-    "Try to capture as many aspects of the trait extraversion as you can."
+    "Extraversion has the following characteristics: gregarious and talkative.",
+    "Generate EXACTLY FOUR items that target EACH characteristic. This is VERY important.",
+    "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
   )
 
 )
@@ -203,8 +209,9 @@ custom_cleaning <- function(content) {
   items <- items[nzchar(items)]
   items <- gsub("\\\\*", "", items)
 
-  # Initialize list to store cleaned item statements
-  item_texts <- list()
+  # Initialize data frame to store cleaned item statements and attributes
+  item_texts <- c()
+  item_attributes <- c()
 
   # Iterate over items
   for (item in items) {
@@ -216,22 +223,29 @@ custom_cleaning <- function(content) {
       # Assume that the second element is the item statement
       item_text <- trimws(split_item[2])
 
+      # Assume that the first element is the item characteristic
+     item_attribute <- trimws(split_item[1])
+
       # Remove unwanted characters
       item_text <- gsub(">", "", item_text)
       item_text <- gsub("<", "", item_text)
+      item_attribute <- gsub(">", "", item_attribute)
+      item_attribute <- gsub("<", "", item_attribute)
 
       # Append to list
       item_texts <- c(item_texts, item_text)
+      item_attributes <- c(item_attribute, item_attributes)
 
     }
   }
 
-  # Return a list of cleaned item statements
-  return(item_texts)
+  # Return a data frame of cleaned item statements
+  return(data.frame("item"=item_texts, "attribute"=item_attributes))
 }
 
 # Run AI-GENIE to generate, validate, and redundancy-check an item pool for your new scale.
 personality.inventory.results.custom <- AIGENIE(
+  item.attributes = aspects.of.personality.traits, # created in example 1
   user.prompts = custom.personality.prompts,
   openai.API = key, # created in example 1
   cleaning.fun = custom_cleaning,

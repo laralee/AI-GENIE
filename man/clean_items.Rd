@@ -7,7 +7,8 @@
 clean_items(
   response,
   split_content,
-  current_items = data.frame(type = NULL, statement = NULL)
+  current_items = data.frame(type = NULL, attribute = NULL, statement = NULL),
+  current_label
 )
 }
 \arguments{
@@ -16,6 +17,8 @@ clean_items(
 \item{split_content}{A character vector containing stemmed characteristics to validate against.}
 
 \item{current_items}{A data frame of the current items collected so far. Defaults to an empty data frame.}
+
+\item{current_label}{A string of the item type currently being examined}
 }
 \value{
 A data frame with columns:

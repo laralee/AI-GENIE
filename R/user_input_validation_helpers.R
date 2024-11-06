@@ -410,21 +410,29 @@ validate_no_missing_data <- function(item.data) {
 #' @param string A string used in error messages to specify the name of the data.
 #' @return No return value; the function stops with an error message if validation fails.
 validate_columns <- function(item.data, string) {
-  if (ncol(item.data) != 2) {
-    stop(paste("Ensure", string, "has exactly two columns: one for items and one for item types/labels."))
+  if (ncol(item.data) != 3) {
+    stop(paste("Ensure", string, "has exactly three columns: ", "\n",
+               "one for items (called `statement`), ", "\n",
+               "one for item types/labels (called `type`),", "\n",
+               "and one for item attributes (called `attribute`)."))
   }
-  col1 <- item.data[[1]]
-  col2 <- item.data[[2]]
 
-  if(!is.numeric(col1) && !is.character(col1)){
-    stop(paste("The first column of", string, "is neither a numeric type nor a character type."))
+  validate_cols <- sapply(colnames(item.data), function(x){x %in% c("statement", "type", "attribute")})
+
+  if(!all(validate_cols)){
+    stop(paste("Ensure the coloumns of", string, "are named `statement`, `type`, and `attribute`."))
   }
-  if(!is.numeric(col1) && !is.character(col1)){
-    stop(paste("The second column of", string, "is neither a numeric type nor a character type."))
+
+  col1 <- item.data[,1]
+  col2 <- item.data[,2]
+  col3 <- item.data[,3]
+
+  validate_cols <- sapply(list(col1, col2, col3), is.character)
+
+  if(!all(validate_cols)){
+    stop(paste("Ensure all columns of", string, "are character type."))
   }
-  if(is.numeric(col1) && is.numeric(col2)){
-    stop(paste("At least one of your columns in", string, "must be a character type."))
-  }
+
 }
 
 
@@ -449,14 +457,19 @@ clean_item_data <- function(item.data, string) {
 #' @param items A character vector of item statements.
 #' @param item.labels A character vector of item labels.
 #' @param string A string used in error messages to specify the name of the data.
+#' @param item.attributes A character vector of the item attributes
 #' @return No return value; the function stops with an error message if validation fails.
-validate_non_empty_items_labels <- function(items, item.labels, string) {
+validate_non_empty_items_labels <- function(items, item.labels, item.attributes, string) {
   if (any(nchar(items) == 0)) {
     stop(paste("All items in", string, "must be non-empty strings and not just whitespace."))
   }
 
   if (any(nchar(item.labels) == 0)) {
-    stop(paste("All labels in",string,"must be non-empty strings after conversion from numeric types."))
+    stop(paste("All item type labels in",string,"must be non-empty strings after conversion from numeric types."))
+  }
+
+  if (any(nchar(item.attributes) == 0)) {
+    stop(paste("All item attribute labels in",string,"must be non-empty strings after conversion from numeric types."))
   }
 }
 
@@ -469,7 +482,8 @@ validate_non_empty_items_labels <- function(items, item.labels, string) {
 #' @param string A string used in error messages to specify the name of the data.
 #' @return A deduplicated data frame of item data.
 deduplicate_item_data <- function(item.data, string) {
-  item.data <- unique(data.frame("statement" = item.data[["statement"]], "type" = item.data[["type"]], stringsAsFactors = FALSE))
+  item.data <- unique(data.frame("statement" = item.data[["statement"]], "type" = item.data[["type"]],
+                                 "attribute" = item.data[["attribute"]],stringsAsFactors = FALSE))
   return(item.data)
 }
 
@@ -499,11 +513,18 @@ validate_no_duplicate_items <- function(item.data, string) {
 #' @param item.data The item data to validate.
 #' @param min_items_per_type An integer specifying the minimum required items per type. Defaults to 5.
 #' @return No return value; the function stops with an error message if validation fails.
-validate_items_per_type <- function(item.data, min_items_per_type = 5) {
+validate_items_per_type <- function(item.data, min_items_per_type = 30, min_per_attribute = 10) {
   item_counts <- table(item.data$type)
   if (any(item_counts < min_items_per_type)) {
     insufficient_types <- names(item_counts)[item_counts < min_items_per_type]
     stop(paste("Please provide at least", min_items_per_type, "items per item type. Found fewer items for the following types:",
+               paste(insufficient_types, collapse = ", "), "."))
+  }
+
+  item_counts <- table(item.data$attribute)
+  if (any(item_counts < min_per_attribute)) {
+    insufficient_types <- names(item_counts)[item_counts < min_per_attribute]
+    stop(paste("Please provide at least", min_per_attribute, "items per item attribute. Found fewer items for the following attributes:",
                paste(insufficient_types, collapse = ", "), "."))
   }
 }
@@ -520,35 +541,6 @@ validate_total_items <- function(item.data, min_items = 50) {
   if (nrow(item.data) < min_items) {
     stop(paste("Please provide at least", min_items, "items to analyze. Currently, there are only", nrow(item.data), "items."))
   }
-}
-
-
-#' Find Columns
-#'
-#' Attempts to determine which columns in the item data correspond to item statements and item types. Relies on the assumption that item statements are more unique than item types.
-#'
-#' @param item.data The item data to process.
-#' @param string A string used in error messages to specify the name of the data.
-#' @return A data frame with columns \code{statement} and \code{type}.
-find_cols <- function(item.data, string) {
-  if(!is.null(item.data$statement) && !is.null(item.data$type)){
-    return(item.data)
-  }
-  col1 <- as.character(item.data[[1]])
-  col2 <- as.character(item.data[[2]])
-
-    if(sum(nchar(col1)) > sum(nchar(col2))){
-      item.data <- data.frame("type" = col2, "statement" = col1)
-    } else if (sum(nchar(col2)) > sum(nchar(col1))) {
-      item.data <- data.frame("type" = col1, "statement" = col2)
-    } else {
-      stop(paste("Unable to determine which column in", string,
-                 "is your item statement column and which is the item type column.",
-                 "Ensure your item statements are unique from row to row, while your item labels",
-                 "can repeat."))
-    }
-
-  return(item.data)
 }
 
 
@@ -751,10 +743,8 @@ validate_custom <- function(custom, item.attributes, user.prompts, cleaning.fun)
     if (is.null(cleaning.fun)) {
       stop("When 'custom' is TRUE, 'cleaning.fun' must be provided. If you do not want to provide custom prompts and a cleaning function, set 'custom' to FALSE.")
     }
-  } else {
-    # Ensure item.attributes is provided
-    if (is.null(item.attributes)) {
-      stop("When 'custom' is FALSE, 'item.attributes' must be provided.")
+    if (!identical(tolower(sort(names(item.attributes))), tolower(sort(names(user.prompts))))){
+      stop("Ensure there is exactly one prompt specified for each item type provided in the `item.attributes` object.")
     }
   }
 

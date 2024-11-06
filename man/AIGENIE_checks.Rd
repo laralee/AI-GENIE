@@ -26,12 +26,13 @@ AIGENIE_checks(
   keep.org,
   plot,
   plot.stability,
+  calc.final.stability,
   silently,
   ...
 )
 }
 \arguments{
-\item{item.attributes}{(Required when \code{custom = FALSE}) A named list or data frame containing item type labels and their corresponding attributes.}
+\item{item.attributes}{A named list or data frame containing item type labels and their corresponding attributes.}
 
 \item{openai.API}{A required character string of your OpenAI API key.}
 
@@ -72,6 +73,8 @@ AIGENIE_checks(
 \item{plot}{Logical; if \code{TRUE}, displays the network plots.}
 
 \item{plot.stability}{Logical; Specifies whether to display the secondary network stability plots.}
+
+\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction.}
 
 \item{silently}{Logical; if \code{TRUE}, suppresses console output.}
 

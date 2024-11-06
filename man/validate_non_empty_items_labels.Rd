@@ -4,12 +4,14 @@
 \alias{validate_non_empty_items_labels}
 \title{Validate Non-Empty Items and Labels}
 \usage{
-validate_non_empty_items_labels(items, item.labels, string)
+validate_non_empty_items_labels(items, item.labels, item.attributes, string)
 }
 \arguments{
 \item{items}{A character vector of item statements.}
 
 \item{item.labels}{A character vector of item labels.}
+
+\item{item.attributes}{A character vector of the item attributes}
 
 \item{string}{A string used in error messages to specify the name of the data.}
 }

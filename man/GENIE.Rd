@@ -6,16 +6,20 @@
 \usage{
 GENIE(
   items,
+  item.attributes,
   openai.API,
   EGA.model = "tmfg",
   plot = TRUE,
   plot.stability = FALSE,
+  calc.final.stability = FALSE,
   silently = FALSE,
   ...
 )
 }
 \arguments{
 \item{items}{A required data frame containing your item statements and item type labels. The data frame should have two columns: one containing the item statements and one containing the item type labels. The column names do not need to be specific; the function will determine which column contains the item statements and which contains the item type labels. There must be at least two distinct item types which each contain at least 15 items. The total number of unique items should be at least 50.}
+
+\item{item.attributes}{A required named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.}
 
 \item{openai.API}{A required character string of your OpenAI API key.}
 
@@ -24,6 +28,8 @@ GENIE(
 \item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display summary network plots.}
 
 \item{plot.stability}{Logical; defaults to \code{FALSE}. Specifies whether to display the secondary network stability plots.}
+
+\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction. Setting this parameter to \code{TRUE} significantly increases computational expense. Changing this value will NOT change item reduction outcome.}
 
 \item{silently}{Logical; defaults to \code{FALSE}. When \code{TRUE}, suppresses console output.}
 }

@@ -4,7 +4,11 @@
 \alias{validate_items_per_type}
 \title{Validate Items Per Type}
 \usage{
-validate_items_per_type(item.data, min_items_per_type = 5)
+validate_items_per_type(
+  item.data,
+  min_items_per_type = 30,
+  min_per_attribute = 10
+)
 }
 \arguments{
 \item{item.data}{The item data to validate.}

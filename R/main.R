@@ -6,7 +6,7 @@
 #'
 #' Generate, validate, and assess your items for quality and redundancy using AI-GENIE (Automatic Item Generation and Validation via Network-Integrated Evaluation). This function generates items using your chosen language model, embeds the items, and performs AI-GENIE item validation and redundancy reduction to refine the item pool. You can either have the function construct prompts for you using provided item attributes and optional high-quality item examples (recommended), or supply your own custom prompts. If providing custom prompts, you must also provide a text cleaning function that can parse and extract item statements from the model output.
 #'
-#' @param item.attributes (Required when `custom = FALSE`) A named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.
+#' @param item.attributes A required named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.
 #' @param user.prompts (Required when `custom = TRUE`) A named list or data frame of custom prompt strings for each item type. Each prompt must be a single character string associated with an item type label.
 #' @param item.type.definitions An optional named list or data frame providing definitions for each item type. Each definition should be a character string not exceeding 250 characters. This helps the language model understand the item types better. Definitions are included at the beginning of the prompts for their corresponding item types.
 #' @param cleaning.fun (Required when `custom = TRUE`) A text cleaning function that can clean and parse the model's expected text output given your custom prompt. The function must accept exactly one parameter (the model's output) and return a list of cleaned items.
@@ -27,6 +27,7 @@
 #' @param keep.org Logical; defaults to `FALSE`. When `TRUE`, returns a data frame of the original item pool.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display the main summary network plots.
 #' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
+#' @param calc.final.stability Logical; defaults to `FALSE`. Specifies whether to compute the stability of the item pool before and after item reduction. Setting this parameter to `TRUE` significantly increases computational expense. Changing this value will NOT change item reduction outcome.
 #' @param silently Logical; defaults to `FALSE`. When `TRUE`, suppresses console output.
 #' @return A list containing:
 #' \describe{
@@ -64,9 +65,9 @@
 #'
 #' # Item attributes
 #' aspects.of.personality.traits <- list(
-#'   neuroticism = c("perfectionism", "temperamental", "overthinking"),
-#'   openness = c("worldly", "artistic", "philosophical", "curious"),
-#'   extraversion = c("gregarious", "talkative")
+#'   neuroticism = c("anxious", "depressed", "insecure", "emotional"),
+#'   openness = c("creative", "perceptual", "curious", "philosophical"),
+#'   extraversion = c("friendly", "positive", "assertive", "energetic")
 #' )
 #'
 #' # Example items - these should be plain, unformatted, high-quality examples.
@@ -116,29 +117,32 @@
 #'
 #'   # Prompt for generating neuroticism traits
 #'   neuroticism = paste0(
-#'     "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
+#'     "Generate NINE unique, psychometrically robust single-statement items designed to assess ",
 #'     "the Big Five personality trait neuroticism. Put EACH item on its own line. ",
-#'     "Format the items EXACTLY like so: \n<neuroticism>||<item statement>\n",
-#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition. ",
-#'     "Try to capture as many aspects of the trait neuroticism as you can."
+#'     "Neuroticism has the following characteristics: perfectionism, temperamental, and overthinking.",
+#'     "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important.",
+#'     "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
 #'   ),
 #'
 #'   # Prompt for generating openness traits
 #'   openness = paste0(
-#'     "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
+#'     "Generate TWELVE unique, psychometrically robust single-statement items designed to assess ",
 #'     "the Big Five personality trait openness. Put EACH item on its own line. ",
-#'     "Format the items EXACTLY like so: \n<openness>||<item statement>\n",
-#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition. ",
-#'     "Try to capture as many aspects of the trait openness as you can."
+#'     "Openness has the following characteristics: worldly, artistic, philosophical, and curious.",
+#'     "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important.",
+#'     "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
 #'   ),
 #'
 #'   # Prompt for generating extraversion traits
 #'   extraversion = paste0(
 #'     "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
 #'     "the Big Five personality trait extraversion. Put EACH item on its own line. ",
-#'     "Format the items EXACTLY like so: \n<extraversion>||<item statement>\n",
-#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition. ",
-#'     "Try to capture as many aspects of the trait extraversion as you can."
+#'     "Extraversion has the following characteristics: gregarious and talkative.",
+#'     "Generate EXACTLY FOUR items that target EACH characteristic. This is VERY important.",
+#'     "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
 #'   )
 #'
 #' )
@@ -152,8 +156,9 @@
 #'   items <- items[nzchar(items)]
 #'   items <- gsub("\\*", "", items)
 #'
-#'   # Initialize list to store cleaned item statements
-#'   item_texts <- list()
+#'   # Initialize data frame to store cleaned item statements and attributes
+#'   item_texts <- c()
+#'   item_attributes <- c()
 #'
 #'   # Iterate over items
 #'   for (item in items) {
@@ -165,22 +170,29 @@
 #'       # Assume that the second element is the item statement
 #'       item_text <- trimws(split_item[2])
 #'
+#'       # Assume that the first element is the item characteristic
+#'      item_attribute <- trimws(split_item[1])
+#'
 #'       # Remove unwanted characters
 #'       item_text <- gsub(">", "", item_text)
 #'       item_text <- gsub("<", "", item_text)
+#'       item_attribute <- gsub(">", "", item_attribute)
+#'       item_attribute <- gsub("<", "", item_attribute)
 #'
 #'       # Append to list
 #'       item_texts <- c(item_texts, item_text)
+#'       item_attributes <- c(item_attribute, item_attributes)
 #'
 #'     }
 #'   }
 #'
-#'   # Return a list of cleaned item statements
-#'   return(item_texts)
+#'   # Return a data frame of cleaned item statements
+#'   return(data.frame("item"=item_texts, "attribute"=item_attributes))
 #' }
 #'
 #' # Run AI-GENIE to generate, validate, and redundancy-check an item pool for your new scale.
 #' personality.inventory.results.custom <- AIGENIE(
+#'   item.attributes = aspects.of.personality.traits, # created in example 1
 #'   user.prompts = custom.personality.prompts,
 #'   openai.API = key, # created in example 1
 #'   cleaning.fun = custom_cleaning,
@@ -192,13 +204,13 @@
 #' # View the final item pool
 #' View(personality.inventory.results.custom$main_result)
 #' }
-AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom = FALSE,
+AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE,
                     user.prompts = NULL, item.type.definitions = NULL,
                     cleaning.fun = NULL, system.role = NULL,
                     scale.title = NULL, sub.domain = NULL, model = "gpt3.5", item.examples = NULL,
                     target.N = 100, temperature = 1, top.p = 1, items.only = FALSE, adaptive = TRUE,
                     EGA.model = "tmfg", keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
-                    silently = FALSE, ...) {
+                    calc.final.stability = FALSE, silently = FALSE, ...) {
 
   # Perform input validation
   validated_params <- AIGENIE_checks(
@@ -223,6 +235,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
     keep.org = keep.org,
     plot = plot,
     plot.stability = plot.stability,
+    calc.final.stability = calc.final.stability,
     silently = silently,
     ...
   )
@@ -248,6 +261,14 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
       ...
     )
 
+  # change the item attributes to the appropriate, un-stemmed labels
+  names(item.attributes) <- NULL
+  item.attributes <- unlist(item.attributes)
+  item.attributes <- trimws(tolower(gsub("[[:punct:]]", "", item.attributes)))
+  stemmed_attributes <- tm::stemDocument(item.attributes)
+
+  attribute_map <- setNames(item.attributes, stemmed_attributes)
+  generated_items$attribute <- attribute_map[generated_items$attribute]
 
   if (items.only) {
     return(generated_items)
@@ -262,6 +283,7 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
     keep.org = keep.org,
     plot = plot,
     plot.stability = plot.stability,
+    calc.final.stability = calc.final.stability,
     silently = silently,
     ...
   )
@@ -279,10 +301,12 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #' Validate and assess your existing items for quality and redundancy using AI-GENIE (Automatic Item Generation and Validation via Network-Integrated Evaluation). This function embeds user-provided items and performs AI-GENIE item validation and redundancy reduction to refine the item pool.
 #'
 #' @param items A required data frame containing your item statements and item type labels. The data frame should have two columns: one containing the item statements and one containing the item type labels. The column names do not need to be specific; the function will determine which column contains the item statements and which contains the item type labels. There must be at least two distinct item types which each contain at least 15 items. The total number of unique items should be at least 50.
+#' @param item.attributes A required named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.
 #' @param openai.API A required character string of your OpenAI API key.
 #' @param EGA.model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display summary network plots.
 #' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
+#' @param calc.final.stability Logical; defaults to `FALSE`. Specifies whether to compute the stability of the item pool before and after item reduction. Setting this parameter to `TRUE` significantly increases computational expense. Changing this value will NOT change item reduction outcome.
 #' @param silently Logical; defaults to `FALSE`. When `TRUE`, suppresses console output.
 #' @return A list containing:
 #' \describe{
@@ -389,13 +413,14 @@ AIGENIE <- function(item.attributes = NULL, openai.API, groq.API = NULL, custom 
 #' # View the final item pool
 #' View(my.personality.inventory.results$main_result)
 #' }
-GENIE <- function(items, openai.API, EGA.model="tmfg", plot=TRUE, plot.stability = FALSE, silently=FALSE, ...) {
+GENIE <- function(items, item.attributes, openai.API, EGA.model="tmfg", plot=TRUE, plot.stability = FALSE, calc.final.stability=FALSE, silently=FALSE, ...) {
 
   # check the user-provided items
-  checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA.model=EGA.model,
-                         plot=plot, silently=silently)
+  checks <- GENIE_checks(item.data=items, item.attributes= item.attributes, openai.API=openai.API, EGA.model=EGA.model,
+                         plot=plot, plot.stability= plot.stability, calc.final.stability= calc.final.stability, silently=silently)
   openai.API <- checks[["openai.API"]]
   items <- checks[["items"]]
+  item.attributes <- checks[["item.attributes"]]
 
   # run the pipeline
   run_pipeline <- run_pipeline(items = items, EGA.model = EGA.model,openai.key=openai.API,

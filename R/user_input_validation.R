@@ -4,7 +4,7 @@
 #'
 #' Validates and processes the input parameters for the \code{AIGENIE} function. This function ensures that all required parameters are provided, correctly formatted, and meet the necessary conditions for the AI-GENIE pipeline to run successfully. It handles both default and custom modes.
 #'
-#' @param item.attributes (Required when \code{custom = FALSE}) A named list or data frame containing item type labels and their corresponding attributes.
+#' @param item.attributes A named list or data frame containing item type labels and their corresponding attributes.
 #' @param openai.API A required character string of your OpenAI API key.
 #' @param groq.API (Required when using open-source models) A character string of your Groq API key.
 #' @param custom Logical; indicates whether custom prompts and a custom cleaning function are used. Defaults to \code{FALSE}.
@@ -25,6 +25,7 @@
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results.
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
 #' @param plot.stability Logical; Specifies whether to display the secondary network stability plots.
+#' @param calc.final.stability Logical; defaults to `FALSE`. Specifies whether to compute the stability of the item pool before and after item reduction.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @param ... Additional arguments (currently not used).
 #' @return A list of validated and processed parameters ready for use in the \code{AIGENIE} function.
@@ -32,22 +33,19 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
                            user.prompts, item.type.definitions, cleaning.fun, system.role,
                            scale.title, sub.domain, model, item.examples,
                            target.N, temperature, top.p, items.only, adaptive, EGA.model,
-                           keep.org, plot, plot.stability, silently, ...) {
+                           keep.org, plot, plot.stability, calc.final.stability, silently, ...) {
 
   # Check for missing arguments (no NA values)
   check_no_na(item.attributes, openai.API, groq.API, custom,
               user.prompts, item.type.definitions, cleaning.fun, system.role,
               scale.title, sub.domain, model, item.examples,
               target.N, temperature, top.p, items.only, adaptive, EGA.model, keep.org,
-              plot, plot.stability, silently)
+              plot, plot.stability, calc.final.stability, silently)
 
   # Validate that 'silently' is a boolean
   if (!is.logical(silently) || length(silently) != 1) {
     stop("'silently' must be a boolean.")
   }
-
-  # Validate that the correct combination of inputs has been supplied
-  custom <- validate_custom(custom, item.attributes, user.prompts, cleaning.fun)
 
   # Simple checks for boolean parameters
   if (!is.logical(items.only) || length(items.only) != 1) {
@@ -65,6 +63,9 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   if (!is.logical(plot.stability) || length(plot.stability) != 1) {
     stop("'plot.stability' must be a boolean.")
   }
+  if (!is.logical(calc.final.stability) || length(calc.final.stability) != 1) {
+    stop("'calc.final.stability' must be a boolean.")
+  }
 
   # Validate EGA.model
   validate_EGA_model(EGA.model)
@@ -73,9 +74,11 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   scale.title <- validate_title_or_domain(scale.title, "scale title")
   sub.domain <- validate_title_or_domain(sub.domain, "sub domain")
 
+  # Validate item.attributes
+  item.attributes <- validate_item_attributes(item.attributes, items.only)
+
   # Validation when custom = FALSE
   if (!custom) {
-    attributes_result <- validate_item_attributes(item.attributes, items.only)
     labels <- names(item.attributes)
     attribute <- item.attributes
     names(attribute) <- NULL
@@ -115,6 +118,9 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   temperature <- params$temperature
   top.p <- params$top.p
 
+  # Validate that the correct combination of inputs has been supplied
+  custom <- validate_custom(custom, item.attributes, user.prompts, cleaning.fun)
+
   # Return everything
   return(list(
     item.attributes=item.attributes, openai.API=openai.API, groq.API=groq.API, custom=custom,
@@ -147,13 +153,16 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #'   \item{\code{items}}{A cleaned and validated data frame of your item data.}
 #'   \item{\code{openai.API}}{Your validated OpenAI API key.}
 #' }
-GENIE_checks <- function(item.data, openai.API, EGA.model, plot, silently) {
+GENIE_checks <- function(item.data, item.attributes, openai.API, EGA.model, plot, plot.stability, calc.final.stability, silently) {
 
-  check_no_na(item.data, openai.API, plot, silently, EGA.model)
+  check_no_na(item.data, openai.API, plot, silently, plot.stability, calc.final.stability, EGA.model, item.attributes)
 
   # quickly validate booleans
   if(!(plot==FALSE || plot==TRUE)){stop("'plot' must be a boolean.")}
   if(!(silently==FALSE || silently==TRUE)){stop("'silently' must be a boolean.")}
+  if(!(plot.stability==FALSE || plot.stability==TRUE)){stop("'plot.stability' must be a boolean.")}
+  if(!(calc.final.stability==FALSE || calc.final.stability==TRUE)){stop("'calc.final.stability' must be a boolean.")}
+
   validate_EGA_model(EGA.model)
 
   # validate the API
@@ -165,22 +174,34 @@ GENIE_checks <- function(item.data, openai.API, EGA.model, plot, silently) {
   validate_no_missing_data(item.data)
   validate_columns(item.data, string)
   item.data <- clean_item_data(item.data, string)
-  item.data <- find_cols(item.data, string)
   item.labels <- item.data[["type"]]
+  item.attribute.labels <- item.data[["attribute"]]
   items <- item.data[["statement"]]
-  validate_non_empty_items_labels(items, item.labels, string)
+  validate_non_empty_items_labels(items, item.labels, item.attribute.labels, string)
   item.data <- deduplicate_item_data(item.data, string)
   validate_no_duplicate_items(item.data, string)
   validate_items_per_type(item.data)
   validate_total_items(item.data)
 
-  min_item_types <- 2
-  if(length(item.labels) < min_item_types){
-    stop("For a meaningful network analysis, include at least two distinct item types.")
+  # Validate item.attributes
+  item.attributes <- validate_item_attributes(item.attributes, FALSE)
+
+  test <- item.attributes
+  names(test) <- NULL
+  test <- unlist(test)
+  validate_item_attribute_labels <- sapply(test, function(x){x %in% item.attribute.labels})
+  validate_item_type_labels <- sapply(names(item.attributes), function(x){x %in% item.labels})
+
+  if(!all(validate_item_attribute_labels)){
+    stop("Ensure the labels in your `item.attributes` object align with the labels in your `attribute` column of the provided data frame.")
+  }
+
+  if(!all(validate_item_type_labels)){
+    stop("Ensure the names of the item types in your `item.attributes` object align with the labels in your `type` column of the provided data frame.")
   }
 
   # Return the cleaned item data object
-  return(list(items = item.data, openai.API=openai.API))
+  return(list(items = item.data, openai.API=openai.API, item.attributes = item.attributes))
 }
 
 
@@ -192,39 +213,62 @@ GENIE_checks <- function(item.data, openai.API, EGA.model, plot, silently) {
 #'
 #' @param output The output object returned by the user-provided \code{cleaning.fun} function.
 #' @param n_empty The number of times the cleaning function failed to return any valid items
-#' @return A list containing the character vector of cleaned item statements and the number of items the cleaning function failed to return viable output consecutively.
-validate_return_object <- function(output, n_empty) {
-  string <- "the output of the provided text cleaning function"
+#' @param item_attributes A named list containing item type labels and their corresponding attributes.
+#' @return A list containing the character vector of cleaned item statements, the character vector containing the cleaned item attributes, and the number of items the cleaning function failed to return viable output consecutively.
+validate_return_object <- function(output, n_empty, item_attributes) {
+  string <- "output of the provided text cleaning function"
 
-  # Check if output is a list
-  if (!is.list(output)) {
-    stop(paste("The", string, "must be a list of cleaned items."))
+  # Check if output is a data frame
+  if (!is.data.frame(output)) {
+    stop(paste("The", string, "must be a data frame of cleaned items."))
   }
 
-  # Ensure all elements in the list are character strings
-  if (!all(sapply(output, is.character))) {
-    stop(paste("All elements in", string, "must be character strings."))
+  if(ncol(output) != 2 || !("item" %in% colnames(output)) || !("attribute" %in% colnames(output))) {
+    stop(paste("The", string, "must be a data frame with two columns: one named `item` and one named `attribute`."))
+  }
+
+
+  # Ensure all elements in the data frame are character strings
+  if (!all(sapply(output$item, is.character)) || !all(sapply(output$attribute, is.character))) {
+    stop(paste("All cells in the", string, "must be character strings."))
+  }
+
+  # Identify and clean the item attributes
+  found_item_attributes <- output$attribute
+  stemmed_found_attributes <- tm::stemDocument(trimws(tolower(gsub("[[:punct:]]", "", found_item_attributes))))
+  names(item_attributes) <- NULL
+  item_attributes <- unlist(item_attributes)
+  item_attributes <- trimws(tolower(gsub("[[:punct:]]", "", item_attributes)))
+  stemmed_attributes <- tm::stemDocument(item_attributes)
+
+  valid_indices <- c()
+  for(i in seq_len(nrow(output))){
+    item <- output$item[[i]]
+    attribute <- stemmed_found_attributes[[i]]
+
+    if(attribute %in% stemmed_attributes && !is.null(item) && !is.na(item) && item != ""){
+      valid_indices <- c(valid_indices, i)
+    }
   }
 
   # Flatten the list into a character vector
-  items <- unlist(output)
+  items <- unlist(output$item[valid_indices])
 
-  # Remove any NA or empty strings
-  items <- items[!is.na(items) & items != ""]
-
-  if (length(items) == 0 && n_empty < 5) {
+  if (length(items) == 0 && n_empty < 50) {
     n_empty <- n_empty + 1
   } else if (length(items) > 0){
     n_empty <- 0
   }
 
-  if (n_empty >= 5){
-    stop("No valid items were returned by the cleaning function after 5 consecutive attempts. Check function logic.")
+  if (n_empty >= 50){
+    stop("No valid items were returned by the cleaning function after 50 consecutive attempts. Check function logic.")
   }
 
 
+  items <- output$item[valid_indices]
+  item_attributes <- stemmed_found_attributes[valid_indices]
 
-  return(list(items=items, n_empty=n_empty))
+  return(list(items=items, item_attributes=item_attributes, n_empty=n_empty))
 }
 
 

@@ -4,7 +4,7 @@
 \alias{get_results}
 \title{Get Results}
 \usage{
-get_results(items, EGA.model, openai.key, silently, ...)
+get_results(items, EGA.model, openai.key, item_type, keep.org, silently, ...)
 }
 \arguments{
 \item{items}{A data frame containing the item statements and types.}
@@ -12,6 +12,10 @@ get_results(items, EGA.model, openai.key, silently, ...)
 \item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
 
 \item{openai.key}{A character string of your OpenAI API key.}
+
+\item{item_type}{A character string of the current item type undergoing reduction}
+
+\item{keep.org}{A logical that specifies whether or not the user wants to keep the original items}
 
 \item{silently}{Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.}
 

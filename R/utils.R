@@ -197,7 +197,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
       if (!custom) {
         # Use the clean_items function to process and clean the AI-generated items
-        current_items_df <- clean_items(response, split_content, data.frame())
+        current_items_df <- clean_items(response, split_content, data.frame(), current_label)
       } else {
         tryCatch({
           output <- cleaner_fun(response$choices[[1]]$message$content)
@@ -208,10 +208,12 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             stop(e)
           }}
         )
-        validate_output <- validate_return_object(output, n_empty)
+        validate_output <- validate_return_object(output, n_empty, item.attributes)
         cleaned_items <- validate_output[["items"]]
         n_empty <- validate_output[["n_empty"]]
+        cleaned_item_attributes <- validate_output[["item_attributes"]]
         current_items_df <- data.frame(type=rep(current_label, length(cleaned_items)),
+                                       attribute= cleaned_item_attributes,
                                        statement=cleaned_items)
       }
 
@@ -253,10 +255,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
         cat(sprintf("\rItems generated for %s: %d", current_label, length(unique_items)))
         flush.console()
       }
-    }
-
-    if(!custom){
-      items_df_medium$type <- rep(current_label, nrow(items_df_medium))
     }
 
     items_df <- rbind(items_df, items_df_medium)
@@ -311,6 +309,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results. Defaults to \code{FALSE}.
 #' @param plot Logical; if \code{TRUE}, displays the network plots. Defaults to \code{TRUE}.
 #' @param plot.stability Logical; Specifies whether to display the secondary network stability plots. Defaults to \code{FALSE}.
+#' @param calc.final.stability Logical; defaults to `FALSE`. Specifies whether to compute the stability of the item pool before and after item reduction.
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing:
@@ -332,10 +331,51 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 run_pipeline <- function(items, openai.key,
                          title = "Networks Before and After AI-Genie",
                          EGA.model= NULL, keep.org = FALSE,
-                         plot = TRUE, plot.stability = FALSE, silently = FALSE, ...){
+                         plot = TRUE, plot.stability = FALSE, calc.final.stability,
+                         silently = FALSE, ...){
 
-  ## Get results
-  results <- get_results(items=items, EGA.model=EGA.model, openai.key = openai.key, silently = silently)
+
+
+
+  ## Get results for each trait type
+  trait_type_indices <- split(seq_len(nrow(items)), items$type)
+  item_type_names <- unique(items$type)
+  item_level_results <- setNames(vector("list", length(item_type_names)), item_type_names)
+
+  all_embeds <- data.frame(matrix(NA, nrow = 1536, ncol = 0))
+  all_truth <- items$attribute
+  embeddings_reduced <- data.frame(matrix(NA, nrow = 1536, ncol = 0))
+  items_reduced <- data.frame(matrix(NA, ncol = 3, nrow = 0))
+  truth_reduced <- c()
+
+  if(!silently) {
+    cat("\n")
+  }
+
+  for (i in 1:length(trait_type_indices)){
+  item_type <- names(trait_type_indices)[[i]]
+  results <- get_results(items=items[trait_type_indices[[i]],], EGA.model=EGA.model, openai.key = openai.key, item_type=item_type,
+                         keep.org=keep.org,silently = silently)
+  curr_embeds <- results[["embeddings"]]
+  results <- results[["result"]]
+
+  curr_items <- data.frame("statement"=results$main_result$statement,
+                           "attribute"=results$main_result$attribute,
+                           "type"= rep(item_type, length(results$main_result$attribute)))
+
+  all_embeds <- cbind(curr_embeds, all_embeds)
+
+
+  embeddings_reduced <- cbind(results$embeddings, embeddings_reduced)
+
+  items_reduced <- rbind(curr_items, items_reduced)
+  truth_reduced <- c(curr_items$attribute, truth_reduced)
+
+
+  if (keep.org) {
+    results[["original_items"]] <- items[trait_type_indices[[i]],]
+  }
+
 
   if(!silently){
   flush.console()
@@ -344,18 +384,20 @@ run_pipeline <- function(items, openai.key,
 
 
 
-    if(plot){
       p1 <- results[["initial_ega_obj"]]
       p2 <- results[["final_ega_obj"]]
 
-       plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Network",
+      network_plot <- plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Network",
                                       caption2 = "After AI-GENIE Network",
                                       nmi2 = results[["nmi"]],
                                       nmi1 = results[["start_nmi"]],
-                                      scale.title = title, ident=FALSE)
-    }
+                                      scale.title = paste(title, "(For",item_type, "Items)"), ident=FALSE)
 
-  if(plot.stability){
+    if(plot){
+      plot(network_plot)
+    }
+      results[["network_plot"]] <- network_plot
+
     p1 <- results[["initial_bootega_obj"]]
     p2 <- results[["final_bootega_obj"]]
 
@@ -363,24 +405,93 @@ run_pipeline <- function(items, openai.key,
 
     ident <- ifelse(attributes(results[["main_result"]])$methods[["bootega_count"]] == "1",  TRUE, FALSE)
 
-    plot_networks(p1 = itemStability(p1), p2 = itemStability(p2),
+    stability_plots <- plot_networks(p1 = p1, p2 = p2,
                                     caption1 = "Before BootEGA Step",
                                     caption2 = "After BootEGA Step",
                                     nmi2=results[["nmi"]],
                                     nmi1=nmi_start,
-                                    scale.title = title,
+                                    scale.title = paste(title, "(For",item_type, "Items)"),
                                     ident=ident)
+
+    if (plot.stability){
+      plot(stability_plots)
+    }
+
+    results[["stability_plot"]] <- stability_plots
+
+  item_level_results[[item_type]] <- results
   }
 
   if(!silently){
-  print_results(results)
+  cat("\n")
+  cat("Item-level analysis complete.")
+  cat("\n")
+  cat("\n")
+  cat("Checking quality of item reduction on the sample overall...")
   }
 
- if(!keep.org){return(results)}
-  else {
-    results <- append(results, items)
-    names(results)[length(results)] <- "original_items"
-    return(results)}
+  complied_results <- compute_ega_full_sample(embedding_reduced = embeddings_reduced,
+                                              embedding = all_embeds,
+                                              items_reduced = items_reduced,
+                                              items = items,
+                                              truth_reduced = truth_reduced,
+                                              truth = all_truth,
+                                              EGA.model = EGA.model,
+                                              title=title,
+                                              calc.final.stability = calc.final.stability,
+                                              silently = silently)
+
+  if (calc.final.stability){
+  overall_result <- list(
+      main_result = complied_results$items_reduced,
+      final_ega_obj = complied_results$final_ega,
+      final_bootega_obj = complied_results$final_bootstrap,
+      initial_ega_obj = complied_results$before_ega,
+      initial_bootega_obj = complied_results$initial_bootstrap,
+      embedding_type = complied_results$embedding_type,
+      selected_model = complied_results$model_used,
+      nmi = complied_results$final_nmi,
+      start_nmi = complied_results$before_nmi,
+      start_N = nrow(items),
+      final_N = nrow(complied_results$items_reduced),
+      network_plot = complied_results$network_plot,
+      stability_plot = complied_results$stability_plot
+    )
+  } else {
+    overall_result <- list(
+      main_result = complied_results$items_reduced,
+      final_ega_obj = complied_results$final_ega,
+      initial_ega_obj = complied_results$before_ega,
+      embedding_type = complied_results$embedding_type,
+      selected_model = complied_results$model_used,
+      nmi = complied_results$final_nmi,
+      start_nmi = complied_results$before_nmi,
+      start_N = nrow(items),
+      final_N = nrow(complied_results$items_reduced),
+      network_plot = complied_results$network_plot
+    )
+  }
+
+  if(keep.org){
+    overall_result[["all_item_embeddings"]] <- all_embeds
+    overall_result[["original_items"]] <- items
+  }
+
+  overall_result[["embeddings"]] <- embeddings_reduced
+
+
+  if(plot){
+    plot(complied_results$network_plot)
+  }
+
+  if(plot.stability && calc.final.stability){
+    plot(complied_results$stability_plot)
+  }
+
+  print_results(overall_result)
+
+  return(list(overall_sample = overall_result,
+              item_type_level = item_level_results))
 }
 
 
@@ -430,7 +541,7 @@ plot_networks <- function(p1, p2, caption1, caption2, nmi2, nmi1, scale.title, i
         ))
   }
 
-  plot(combined_plot)
+  return(combined_plot)
 }
 
 

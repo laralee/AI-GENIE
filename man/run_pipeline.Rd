@@ -12,6 +12,7 @@ run_pipeline(
   keep.org = FALSE,
   plot = TRUE,
   plot.stability = FALSE,
+  calc.final.stability,
   silently = FALSE,
   ...
 )
@@ -30,6 +31,8 @@ run_pipeline(
 \item{plot}{Logical; if \code{TRUE}, displays the network plots. Defaults to \code{TRUE}.}
 
 \item{plot.stability}{Logical; Specifies whether to display the secondary network stability plots. Defaults to \code{FALSE}.}
+
+\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction.}
 
 \item{silently}{Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.}
 

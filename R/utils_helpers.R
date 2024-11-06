@@ -67,12 +67,15 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #' @param response The response object from the language model API call.
 #' @param split_content A character vector containing stemmed characteristics to validate against.
 #' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
+#' @param current_label A string of the item type currently being examined
 #' @return A data frame with columns:
 #' \describe{
 #'   \item{\code{type}}{The characteristic or attribute associated with each item.}
 #'   \item{\code{statement}}{The cleaned item statement.}
 #' }
-clean_items <- function(response, split_content, current_items = data.frame("type" = NULL, "statement" = NULL)) {
+clean_items <- function(response, split_content,
+                        current_items = data.frame("type" = NULL, "attribute"= NULL, "statement" = NULL),
+                        current_label) {
 
   # Try different formats on the response
   formats <- try_formats(response, split_content)
@@ -82,7 +85,8 @@ clean_items <- function(response, split_content, current_items = data.frame("typ
 
     # Create a new data frame with the cleaned items
     new_items <- data.frame(
-      type = formats$stemmed_characteristics,
+      type = rep(current_label, length(formats$stemmed_characteristics)),
+      attribute = formats$stemmed_characteristics,
       statement = formats$items
     )
 
@@ -115,18 +119,18 @@ create.system.role.prompt <- function(system.role, item.types, scale.title, sub.
   if(is.null(system.role)){
 
     system.role <- paste0(
-        "You are an expert psychometrician and test developer",
-        ifelse(sub.domain != "Networks Before vs After AI-GENIE",
-               paste0(" specializing in ", sub.domain, "."),"."),
-        " Your task is to create high-quality, psychometrically robust items",
-        ifelse(scale.title != "Networks Before vs After AI-GENIE",
-               paste0(" for an inventory called '", scale.title, ".'"), "."))
-    }
+      "You are an expert psychometrician and test developer",
+      ifelse(sub.domain != "Networks Before vs After AI-GENIE",
+             paste0(" specializing in ", sub.domain, "."),"."),
+      " Your task is to create high-quality, psychometrically robust items",
+      ifelse(scale.title != "Networks Before vs After AI-GENIE",
+             paste0(" for an inventory called '", scale.title, ".'"), "."))
+  }
 
   if(!is.null(item.examples)){
     # add in examples if the user provided them.
     system.role <- paste0(system.role, "\n\n Here are some examples of high-quality items that may be found on such a scale."
-      ,"Emulate these items in terms of QUALITY ONLY-- NOT content:\n", item.examples)
+                          ,"Emulate these items in terms of QUALITY ONLY-- NOT content:\n", item.examples)
   }
 
   return(system.role)
@@ -306,6 +310,8 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
   bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, ...)
   boot1 <- bootstrap
 
+  current_boot <- NULL
+
   # Check for instabilities
   while(any(bootstrap$stability$item.stability$item.stability$empirical.dimensions < cut.off)){
 
@@ -324,6 +330,10 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
   }
 
   # Save final bootEGA object
+  if (is.null(current_boot)){
+    current_boot <- boot1
+  }
+
   boot2 <- current_boot
 
   # Add count to items
@@ -346,10 +356,12 @@ remove_instabilities <- function(items, cut.off = 0.75, ...)
 #' @param items A data frame containing the item statements and types.
 #' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
 #' @param openai.key A character string of your OpenAI API key.
+#' @param item_type A character string of the current item type undergoing reduction
+#' @param keep.org A logical that specifies whether or not the user wants to keep the original items
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
-get_results <- function(items, EGA.model, openai.key, silently, ...) {
+get_results <- function(items, EGA.model, openai.key, item_type, keep.org, silently, ...) {
 
   # Define the possible models
   possible_models <- c("tmfg", "glasso")
@@ -357,7 +369,7 @@ get_results <- function(items, EGA.model, openai.key, silently, ...) {
   # Generate embeddings once
   if(!silently){
     cat("\n")
-    cat("Staring AI-GENIE Reduction Analysis...")
+    cat(paste0("Starting AI-GENIE Reduction Analysis for ", item_type," items..."))
   }
 
   embedding <- get_embeddings(items, openai.key = openai.key)
@@ -410,7 +422,6 @@ get_results <- function(items, EGA.model, openai.key, silently, ...) {
     final_bootega_obj = chosen_result$final_bootega_obj,
     initial_ega_obj = chosen_result$initial_ega_obj,
     initial_bootega_obj = chosen_result$initial_bootega_obj,
-    embeddings = chosen_result$embeddings,
     embedding_type = attributes(chosen_result$main_result)$method[["embedding"]],
     selected_model = chosen_model,
     nmi = chosen_result$nmi,
@@ -419,7 +430,14 @@ get_results <- function(items, EGA.model, openai.key, silently, ...) {
     final_N = chosen_result$final_N
   )
 
-  return(final_output)
+  if(keep.org){
+    final_output[["all_item_embeddings"]] <- embedding
+  }
+
+  final_output[["embeddings"]] <- chosen_result$embeddings
+
+
+  return(list(result=final_output, embeddings=embedding))
 }
 
 
@@ -452,7 +470,7 @@ print_results<-function(obj){
 
   cat("\n")
   cat("\n")
-  cat("                          AI-Genie Results")
+  cat(paste("                          AI-Genie Results"))
   cat("\n")
   cat("                          ----------------")
   cat("\n")
@@ -460,7 +478,7 @@ print_results<-function(obj){
             "    Staring N:", initial_items, "    Final N:", final_items))
   cat("\n")
   cat(paste0("             Initial NMI: ", round(before_nmi,4) * 100, "%",
-      "           Final NMI: ", round(after_genie,4) * 100, "%"))
+             "           Final NMI: ", round(after_genie,4) * 100, "%"))
   cat("\n")
   cat("\n")
 }
@@ -486,10 +504,10 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
 
   # Assign unique IDs
   items$ID <- as.factor(1:nrow(items))
-  items <- items[, c("ID", "statement", "type")]
+  items <- items[, c("ID", "statement", "type", "attribute")]
 
   ## Get truth
-  truth <- as.numeric(factor(tolower(items$type)))
+  truth <- as.numeric(factor(tolower(items$attribute)))
   names(truth) <- items$statement
 
   # Use the pre-generated embeddings
@@ -545,17 +563,17 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
   colnames(unique_items) <- items$ID[items$statement %in% colnames(unique_items)]
 
   tryCatch(
-  boot_res <- remove_instabilities(items=unique_items,
-                                   model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE),
-  error = function(e) {
-    if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
-      cat(" ...BootEGA failed. Trying new seed...")
-      boot_res <- remove_instabilities(items=unique_items,
-                                       model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE,
-                                       seed=sample(1:1000, 1))
-    } else {
-      stop(e)
-    }}
+    boot_res <- remove_instabilities(items=unique_items,
+                                     model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE),
+    error = function(e) {
+      if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
+        cat(" ...BootEGA failed. Trying new seed...")
+        boot_res <- remove_instabilities(items=unique_items,
+                                         model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE,
+                                         seed=sample(1:1000, 1))
+      } else {
+        stop(e)
+      }}
   )
 
   item_set <- boot_res[["items"]]
@@ -581,12 +599,12 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
 
   # Ensure matching rows for both columns
   matched_statements <- colnames(item_set)[colnames(item_set) %in% items$statement]
-  matched_types <- tolower(items$type[items$statement %in% matched_statements])
+  matched_attribute <- tolower(items$attribute[items$statement %in% matched_statements])
 
   # Construct the data frame
   result <- data.frame(
     ID = items$ID[items$statement %in% temp],
-    type = matched_types,
+    attribute = matched_attribute,
     statement = matched_statements,
     EGA_communities = final_ega$wc[match(matched_statements, colnames(item_set))]
   )
@@ -608,13 +626,15 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
   )
 
   # Return result along with NMI
+  final_embeddings <- unique_items_full[, colnames(item_set)]
+
   return(list(
     main_result = result,
     final_ega_obj = final_ega,
     final_bootega_obj = boot_res[["boot2"]],
     initial_ega_obj = before_ega,
     initial_bootega_obj = boot_res[["boot1"]],
-    embeddings = item_set,
+    embeddings = final_embeddings,
     nmi = after_genie,
     start_nmi = before_nmi,
     start_N = dim(embedding)[2],
@@ -674,5 +694,201 @@ handle_error_logic <- function(error_count, unique_items_generated, error_type, 
   return(TRUE)
 }
 
+compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_reduced, truth, truth_reduced,
+                                    EGA.model, title, calc.final.stability, silently){
 
+  # Assign unique IDs
+  full_items <- data.frame("ID"= as.factor(1:nrow(items)),
+                           "statement"= items$statement)
+
+  ## Get truth
+  truth <- as.numeric(factor(tolower(truth)))
+  names(truth) <- items$statement
+
+  # Sparsify embeddings
+
+  embedding_sparse <- as.matrix(embedding)
+  percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+  embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+
+
+  # Determine which EGA model and embedding type is the best given the data
+  if(!silently){
+    cat("\n")
+    cat("Building initial EGA network... ")
+  }
+
+  best_nmi <- 0
+  if(is.null(EGA.model)) {
+    for (model_type in c("tmfg", "glasso")) {
+      for (use.full in c(TRUE, FALSE)) {
+        # Set embedding based on use.full
+        embedding_use <- if (use.full) embedding else embedding_sparse
+
+        # Temporarily change column names
+        temp <- colnames(embedding_use)
+        colnames(embedding_use) <- items$ID
+
+        # Run EGA and calculate NMI
+        before_ega <- EGA.fit(data = embedding_use, model = model_type, plot.EGA = FALSE, verbose = FALSE)$EGA
+        colnames(embedding_use) <- temp  # Restore original column names
+        before_nmi <- igraph::compare(comm1 = truth, comm2 = before_ega$wc, method = "nmi")
+
+        # Check and update best NMI
+        if (before_nmi > best_nmi) {
+          embedding_type <- if (use.full) "full" else "sparse"
+          model_used <- model_type
+          best_nmi <- before_nmi
+          best_before_ega <- before_ega
+        }
+      }
+    }
+  } else {
+    for (use.full in c(TRUE, FALSE)) {
+      # Set embedding based on use.full
+      embedding_use <- if (use.full) embedding else embedding_sparse
+
+      # Temporarily change column names
+      temp <- colnames(embedding_use)
+      colnames(embedding_use) <- items$ID
+
+      # Run EGA and calculate NMI
+      before_ega <- EGA.fit(data = embedding_use, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+      colnames(embedding_use) <- temp  # Restore original column names
+      before_nmi <- igraph::compare(comm1 = truth, comm2 = before_ega$wc, method = "nmi")
+
+      # Check and update best NMI
+      if (before_nmi > best_nmi) {
+        embedding_type <- if (use.full) "full" else "sparse"
+        model_used <- EGA.model
+        best_nmi <- before_nmi
+        best_before_ega <- before_ega
+      }
+    }
+  }
+
+  # find the initial item stability
+  if(!silently && !calc.final.stability){
+    cat("Done.")
+    cat("\n")
+  }
+
+  if(calc.final.stability && !silently){
+    cat("Done. Now finding initial stability... ")
+    cat("\n")
+    }
+
+  if(calc.final.stability) {
+  if(embedding_type=="full"){
+    embedding_use <- embedding
+  } else {
+    embedding_use <- embedding_sparse
+  }
+
+  if(!silently){
+    verbose <- TRUE
+  } else {
+    verbose <- FALSE
+  }
+
+  bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed=1234, verbose = verbose)
+  if(!silently){
+    cat("Done.")
+  }
+  }
+  # compute final EGA model with the optimal embeddings and model type found
+  if(!silently){
+    cat("Building final EGA network... ")
+  }
+
+  # Sparsify embeddings
+  embedding_reduced_sparse <- as.matrix(embedding_reduced)
+  percentiles <- quantile(embedding_reduced_sparse, probs = c(0.025, 0.975))
+  embedding_reduced_sparse[embedding_reduced_sparse > percentiles[1] & embedding_reduced_sparse < percentiles[2]] <- 0
+
+  if(embedding_type=="full"){
+    embedding_use <- embedding_reduced
+  } else {
+    embedding_use <- embedding_reduced_sparse
+  }
+
+  # Extract unique IDs
+  IDs <- full_items$ID[as.vector(full_items$statement) %in% as.vector(items_reduced$statement)]
+
+  ## Get truth
+  truth <- as.numeric(factor(tolower(truth_reduced)))
+  names(truth) <- colnames(embedding_reduced)
+
+  temp <- colnames(embedding_use)
+  colnames(embedding_use) <- IDs
+  final_ega <- EGA.fit(data=embedding_use, model = model_used, plot.EGA = FALSE, verbose = FALSE)$EGA
+  colnames(embedding_use) <- temp
+  final_nmi <- igraph::compare(comm1 = truth, comm2 = final_ega$wc, method = "nmi")
+
+  items_reduced$ID <- IDs
+  items_reduced$EGA_communities <- as.vector(final_ega$wc)
+
+  if(!silently && !calc.final.stability){
+    cat("Done.")
+    cat("\n")
+  }
+
+  if(!silently && calc.final.stability){
+    cat("Done. Now finding final stability... ")
+    cat("\n")
+  }
+
+  if(calc.final.stability){
+  if(!silently){
+    verbose <- TRUE
+  } else {
+    verbose <- FALSE
+  }
+
+  # Run a stability before vs after
+  bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
+                                seed = 1234, verbose = verbose)
+
+  if(!silently){
+    cat("Done.")
+  }
+  }
+
+  p1 <- best_before_ega
+  p2 <- final_ega
+
+  network_plot <- plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Network",
+                                caption2 = "After AI-GENIE Network",
+                                nmi2 = final_nmi,
+                                nmi1 = best_nmi,
+                                scale.title = title, ident=FALSE)
+
+  if(calc.final.stability){
+    p1 <- bootstrap1
+    p2 <- bootstrap2
+
+    stability_plot <- plot_networks(p1=p1, p2=p2, caption1 = "Before AI-GENIE Item Stability",
+                                  caption2 = "After AI-GENIE Item Stability",
+                                  nmi2 = final_nmi,
+                                  nmi1 = best_nmi,
+                                  scale.title = title, ident=FALSE)
+  }
+
+
+  if(calc.final.stability){
+    return_obj <- list(final_ega=final_ega, before_ega=best_before_ega, before_nmi=best_nmi,
+                       final_nmi=final_nmi, items_reduced = items_reduced,
+                       initial_bootstrap=bootstrap1, final_bootstrap=bootstrap2,
+                       network_plot=network_plot, stability_plot=stability_plot, model_used= model_used,
+                       embedding_type = embedding_type)
+  } else {
+    return_obj <- list(final_ega=final_ega, before_ega=best_before_ega, before_nmi=best_nmi,
+                       final_nmi=final_nmi, items_reduced = items_reduced, network_plot = network_plot,
+                       model_used= model_used, embedding_type = embedding_type)
+  }
+
+
+
+  return(return_obj)
+}
 

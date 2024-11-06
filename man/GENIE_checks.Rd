@@ -4,7 +4,16 @@
 \alias{GENIE_checks}
 \title{GENIE Input Validation}
 \usage{
-GENIE_checks(item.data, openai.API, EGA.model, plot, silently)
+GENIE_checks(
+  item.data,
+  item.attributes,
+  openai.API,
+  EGA.model,
+  plot,
+  plot.stability,
+  calc.final.stability,
+  silently
+)
 }
 \arguments{
 \item{item.data}{A required data frame containing your item statements and item type labels.}
