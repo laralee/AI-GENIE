@@ -855,3 +855,50 @@ validate_item_type_definitions <- function(item.type.definitions, item.types) {
 
   return(item.type.definitions)
 }
+
+
+
+validate_and_extract_attributes <- function(df) {
+
+  # Perform validation checks
+
+  # Check 1: Ensure the input is a data frame
+  if (!is.data.frame(df)) {
+    stop("Input must be a data frame.")
+  }
+
+  # Check 2: Ensure there are exactly three columns named "statement", "type", and "attribute"
+  required_columns <- c("attribute", "statement", "type")
+  if (!all(sort(names(df)) == required_columns)) {
+    stop("Data frame must have exactly three columns named 'statement', 'type', and 'attribute' in that order.")
+  }
+
+  # Check 3: Ensure all columns are character type
+  if (!all(sapply(df, is.character))) {
+    stop("All columns must be of character type.")
+  }
+
+  # Check 4: Ensure there are no missing values
+  if (anyNA(df)) {
+    stop("Data frame must not contain missing values.")
+  }
+
+  # Check 6: Ensure at least 10 rows for each combination of `type` and `attribute`
+  combination_counts <- table(df$type, df$attribute)
+
+  indices <- c()
+  for (i in 1:length(combination_counts)){
+    if(combination_counts[[i]] != 0) {indices <- c(i, indices)}
+  }
+
+  if (any(combination_counts[indices] < 10)) {
+    stop("Each combination of 'type' and 'attribute' must have at least 10 rows.")
+  }
+
+  # Create the named list where each `type` is an element with a list of its unique `attributes`
+  type_attribute_list <- split(df$attribute, df$type)
+  type_attribute_list <- lapply(type_attribute_list, unique) # Ensure unique attributes per type
+
+  # Return the list
+  return(type_attribute_list)
+}

@@ -421,8 +421,7 @@ run_pipeline <- function(items, openai.key,
 
   item_level_results[[item_type]] <- results
   }
-  #plots <- plot_all(item_level_results)
-  #plot(plots[["network_plot"]])
+
 
   if(!silently){
   cat("\n")

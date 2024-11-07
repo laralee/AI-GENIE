@@ -300,14 +300,18 @@ remove_redundancies <- function(embedding, ...)
 #' @param cut.off Numeric; the stability cutoff value. Defaults to \code{0.75}.
 #' @param ... Additional arguments passed to the \code{\link[EGAnet]{bootEGA}} function.
 #' @return A data matrix or data frame with unstable items removed.
-remove_instabilities <- function(items, cut.off = 0.75,...)
+remove_instabilities <- function(items, cut.off = 0.75, verbose, ...)
 {
+  if (verbose){
+    cat("\n")
+  }
 
   # Set counter
   count <- 1
 
   # BootEGA
-  bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE)
+  bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
+                               verbose = verbose)
   boot1 <- bootstrap
 
   current_boot <- NULL
@@ -324,7 +328,7 @@ remove_instabilities <- function(items, cut.off = 0.75,...)
 
     # BootEGA
     bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, seed = 123,
-                                 plot.itemStability = FALSE)
+                                 plot.itemStability = FALSE, verbose = verbose)
 
     current_boot <- bootstrap
   }
@@ -564,12 +568,12 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
 
   tryCatch(
     boot_res <- remove_instabilities(items=unique_items,
-                                     model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE),
+                                     model = EGA.model, EGA.type = "EGA.fit", verbose = !silently),
     error = function(e) {
       if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
         cat(" ...BootEGA failed. Trying new seed...")
         boot_res <- remove_instabilities(items=unique_items,
-                                         model = EGA.model, EGA.type = "EGA.fit", verbose = FALSE,
+                                         model = EGA.model, EGA.type = "EGA.fit", verbose = !silently,
                                          seed=sample(1:1000, 1))
       } else {
         stop(e)

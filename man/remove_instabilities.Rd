@@ -4,7 +4,7 @@
 \alias{remove_instabilities}
 \title{Remove Instabilities}
 \usage{
-remove_instabilities(items, cut.off = 0.75, ...)
+remove_instabilities(items, cut.off = 0.75, verbose, ...)
 }
 \arguments{
 \item{items}{A data matrix or data frame of items after redundancy removal.}

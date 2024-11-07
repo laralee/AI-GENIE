@@ -6,7 +6,6 @@
 \usage{
 GENIE_checks(
   item.data,
-  item.attributes,
   openai.API,
   EGA.model,
   plot,

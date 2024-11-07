@@ -153,9 +153,9 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #'   \item{\code{items}}{A cleaned and validated data frame of your item data.}
 #'   \item{\code{openai.API}}{Your validated OpenAI API key.}
 #' }
-GENIE_checks <- function(item.data, item.attributes, openai.API, EGA.model, plot, plot.stability, calc.final.stability, silently) {
+GENIE_checks <- function(item.data, openai.API, EGA.model, plot, plot.stability, calc.final.stability, silently) {
 
-  check_no_na(item.data, openai.API, plot, silently, plot.stability, calc.final.stability, EGA.model, item.attributes)
+  check_no_na(item.data, openai.API, plot, silently, plot.stability, calc.final.stability, EGA.model)
 
   # quickly validate booleans
   if(!(plot==FALSE || plot==TRUE)){stop("'plot' must be a boolean.")}
@@ -168,12 +168,10 @@ GENIE_checks <- function(item.data, item.attributes, openai.API, EGA.model, plot
   # validate the API
   openai.API <- validate_openai(openai.API)
 
+  item.attributes <- validate_and_extract_attributes(item.data)
+
   string <- "your provided data"
   # Validate the different aspects of item.data
-  item.data <- validate_item_data_type(item.data, string)
-  validate_no_missing_data(item.data)
-  validate_columns(item.data, string)
-  item.data <- clean_item_data(item.data, string)
   item.labels <- item.data[["type"]]
   item.attribute.labels <- item.data[["attribute"]]
   items <- item.data[["statement"]]

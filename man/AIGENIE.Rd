@@ -22,7 +22,7 @@ AIGENIE(
   top.p = 1,
   items.only = FALSE,
   adaptive = TRUE,
-  EGA.model = "tmfg",
+  EGA.model = NULL,
   keep.org = FALSE,
   plot = TRUE,
   plot.stability = FALSE,
