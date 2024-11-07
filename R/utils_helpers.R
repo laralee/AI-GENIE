@@ -300,7 +300,7 @@ remove_redundancies <- function(embedding, ...)
 #' @param cut.off Numeric; the stability cutoff value. Defaults to \code{0.75}.
 #' @param ... Additional arguments passed to the \code{\link[EGAnet]{bootEGA}} function.
 #' @return A data matrix or data frame with unstable items removed.
-remove_instabilities <- function(items, cut.off = 0.75, verbose, ...)
+remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, ...)
 {
   if (verbose){
     cat("\n")
@@ -311,7 +311,7 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, ...)
 
   # BootEGA
   bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                               verbose = verbose)
+                               verbose = verbose, model=model, seed=seed)
   boot1 <- bootstrap
 
   current_boot <- NULL
@@ -327,8 +327,9 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, ...)
 
 
     # BootEGA
-    bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, seed = 123,
-                                 plot.itemStability = FALSE, verbose = verbose)
+    bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE,
+                                 plot.itemStability = FALSE, verbose = verbose,
+                                 model=model, seed=seed)
 
     current_boot <- bootstrap
   }
@@ -568,7 +569,7 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
 
   tryCatch(
     boot_res <- remove_instabilities(items=unique_items,
-                                     model = EGA.model, EGA.type = "EGA.fit", verbose = !silently),
+                                     model = EGA.model, EGA.type = "EGA.fit", verbose = !silently, seed=123),
     error = function(e) {
       if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
         cat(" ...BootEGA failed. Trying new seed...")
@@ -785,13 +786,15 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
 
   if(calc.final.stability) {
     verbose <- !silently
-    bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed = 1234, verbose = verbose)
+    bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
+                                  seed = 1234, verbose = verbose, model = model_used)
 
     embedding_use <- if (embedding_type == "full") embedding_reduced else embedding_reduced_sparse
     temp <- colnames(embedding_use)
     colnames(embedding_use) <- items_reduced$ID
 
-    bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed = 1234, verbose = verbose)
+    bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed = 1234,
+                                  verbose = verbose, model = model_used)
     colnames(embedding_use) <- temp
 
     if(!silently) {

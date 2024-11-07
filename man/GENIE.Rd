@@ -61,144 +61,179 @@ Validate and assess your existing items for quality and redundancy using AI-GENI
 # Add an OpenAI API key
 key <- "INSERT YOUR KEY HERE"
 
+## Create a data frame of items to reduce - for this example, we will focus only on Neuroticism and Extraversion
 
-# Build the data frame - start with the items
-neuroticism_statements <- c( # items that target neuroticism
-  "I often worry about things that may never happen.", "The thought of uncertainty makes me feel uneasy.",
-  "I frequently feel overwhelmed with sadness.", "Even small setbacks can greatly affect my mood.",
-  "I often doubt my own abilities and decisions.", "I often seek reassurance from others to feel confident.",
-  "I am easily moved to tears by sentimental moments.", "I often find myself experiencing intense feelings of joy or sorrow.",
-  "I often feel on edge and apprehensive about the future.", "I tend to overthink and dwell on negative possibilities.",
-  "I frequently experience feelings of hopelessness and despair.", "I often struggle to find joy or pleasure in activities I used to enjoy.",
-  "I often feel inadequate compared to others.", "I am constantly worried about others' opinions of me.",
-  "I am easily swept away by intense emotions.", "I find it challenging to control my emotional reactions.",
-  "I often find myself anticipating the worst possible outcome.", "I frequently feel a sense of dread without any specific reason.",
-  "I often feel like there is a dark cloud hanging over me.", "I struggle to find a sense of purpose or meaning in my daily activities.",
-  "I often feel like I'm not good enough no matter how hard I try.", "I frequently worry about being rejected or abandoned by others.",
-  "I have a tendency to be deeply affected by other people's moods.", "I often find myself experiencing mood swings without a clear trigger.",
-  "I often feel a sense of impending doom for no reason.", "I frequently have irrational fears that something bad will happen.",
-  "I often struggle to see the point in going on each day.", "I find it hard to shake off feelings of sadness and despair.",
-  "I frequently doubt my own self-worth and capabilities.", "I often feel like I don’t measure up to others’ standards.",
-  "I am easily overwhelmed by my emotions, even in mundane situations.", "I often feel like my mood can shift drastically without warning.",
-  "I frequently worry about things that may never happen.", "I often feel a tightness in my chest when faced with uncertainty.",
-  "I frequently worry about possible negative outcomes in everyday situations.", "I often feel like everything is pointless and bleak.",
-  "I frequently struggle to find motivation to get out of bed in the morning.", "I often compare myself unfavorably to others around me.",
-  "I frequently doubt whether I am worthy of love and acceptance.", "I often find myself tearing up over minor incidents.",
-  "I frequently experience intense emotional reactions to everyday events.", "I frequently doubt my own abilities and decisions.",
-  "I frequently seek reassurance from others to feel confident.", "I often find it challenging to control my emotional reactions.",
-  "I frequently feel a sense of impending doom for no reason.", "I often feel overwhelmed with sadness.",
-  "I frequently feel a knot in my stomach over minor uncertainties.", "I am constantly on edge, waiting for something terrible to happen.",
-  "I often struggle to find motivation to engage in activities I used to enjoy.",
-  "I frequently feel a heavy weight of sadness pressing down on me.", "I often doubt whether I am truly deserving of success and happiness.",
-  "I frequently second-guess my social interactions, fearing I said something wrong.", "I find myself tearing up over seemingly insignificant moments.",
-  "I often experience emotional highs and lows without clear reasons.", "I constantly feel a sense of unease and worry, even in everyday situations.",
-  "I often feel panicky and overwhelmed by minor stressors.", "I frequently experience a deep sense of sadness that lingers throughout the day.",
-  "I often feel emotionally drained and devoid of energy for no apparent reason.", "I frequently doubt my worth and significance in the eyes of others.",
-  "I often feel like I don’t belong or fit in with those around me.", "I find myself easily moved to tears by emotional situations.",
-  "I frequently feel overwhelmed by intense feelings that come out of nowhere."
-)
+## Neuroticism items
+# items with the 'anxious' attribute
+statements <- c("I often worry about things that may never happen.",
+"The thought of uncertainty makes me feel uneasy.",
+"I often feel on edge and apprehensive about the future.",
+"I tend to overthink and dwell on negative possibilities.",
+"I often find myself anticipating the worst possible outcome.",
+"I frequently feel a sense of dread without any specific reason.",
+"I often feel a sense of impending doom for no reason.",
+"I frequently have irrational fears that something bad will happen.",
+"I frequently worry about things that may never happen.",
+"I often feel a tightness in my chest when faced with uncertainty.",
+"I frequently worry about possible negative outcomes in everyday situations.",
+"I frequently feel a sense of impending doom for no reason.",
+"I frequently feel a knot in my stomach over minor uncertainties.",
+"I am constantly on edge, waiting for something terrible to happen.",
+"I constantly feel a sense of unease and worry, even in everyday situations.",
+"I often feel panicky and overwhelmed by minor stressors.")
 
+# add the appropriate type and attribute label
+type <- c(rep("neuroticism", 16))
+attribute <- c(rep("anxious", 16))
 
-openness_statements <- c( # items that target openness
-  "I often come up with innovative solutions to complex problems.", "I enjoy expressing myself through various forms of art.",
-  "I notice small details that others often overlook.", "I have a keen eye for aesthetics and beauty.",
-  "I am constantly seeking out new experiences and challenges.", "I enjoy learning about different cultures and ways of life.",
-  "I frequently ponder the mysteries of existence and reality.", "I love engaging in deep conversations about the meaning of life.",
-  "I am adept at coming up with original ideas and concepts.", "I enjoy experimenting with different forms of creative expression.",
-  "I have a heightened awareness of subtle changes in my environment.", "I am attuned to the nuances of people’s body language and facial expressions.",
-  "I have an insatiable thirst for knowledge and learning.", "I am always eager to explore new ideas and perspectives.",
-  "I often contemplate the deeper meanings behind everyday occurrences.", "I enjoy pondering abstract concepts and theories.",
-  "I enjoy thinking outside the box and exploring unconventional solutions.", "I am always finding new ways to express my ideas through artistic mediums.",
-  "I have a knack for noticing patterns and connections that others may miss.", "I am observant and sensitive to the subtleties of the world around me.",
-  "I have an unquenchable thirst for uncovering knowledge and insights.", "I am constantly seeking out new information and experiences to broaden my horizons.",
-  "I often find myself contemplating the deeper meanings and purposes of life.", "I enjoy engaging in discussions about abstract concepts and existential questions.",
-  "I often surprise others with my imaginative and innovative ideas.", "I effortlessly find novel and inventive solutions to challenges.",
-  "I notice the intricate details in art and nature that escape most people.", "I am highly attuned to subtle shifts in emotions and energies around me.",
-  "I am always eager to delve into new subjects and expand my knowledge.", "I find joy in exploring unfamiliar territories and perspectives.",
-  "I frequently ponder the complexities of human existence and consciousness.", "I enjoy contemplating the fundamental nature of reality and existence.",
-  "I enjoy experimenting with unconventional artistic techniques.", "I love devising imaginative solutions to perplexing problems.",
-  "I notice subtle shifts in tone and atmosphere in social settings.", "I have a keen eye for discerning hidden patterns in data.",
-  "I am always eager to explore uncharted intellectual territories.", "I love uncovering new information that challenges my perspectives.",
-  "I enjoy engaging in deep discussions about the nature of reality.", "I often contemplate the deeper meanings behind human actions.",
-  "I thrive in environments that allow me to think creatively and innovatively.", "I enjoy brainstorming unique and imaginative solutions to problems.",
-  "I easily pick up on subtle cues and signals in my surroundings.", "I am highly attuned to the aesthetics and beauty in everyday life.",
-  "I am always seeking to expand my understanding of the world around me.", "I frequently contemplate the deeper meanings behind human actions.",
-  "I enjoy engaging in discussions about existential questions and abstract concepts.", "I find joy in brainstorming innovative solutions to challenges.",
-  "I love devising unique and imaginative ways to approach tasks.", "I am sensitive to the subtle nuances in art and nature.",
-  "I have a keen eye for spotting hidden details in my surroundings.", "I have a constant thirst for uncovering knowledge and insights.",
-  "I enjoy contemplating the deeper meanings behind human actions.", "I love engaging in discussions about existential questions and abstract concepts.",
-  "I enjoy devising unique and imaginative ways to approach tasks.", "I delight in inventing new ways to express my thoughts and ideas.",
-  "I excel at producing original and imaginative solutions to problems.", "I easily notice the slightest changes in my surroundings.",
-  "I have a remarkable ability to detect hidden patterns in complex information.", "I am always eager to explore new intellectual frontiers.",
-  "I find joy in uncovering the mysteries that lie beneath the surface.", "I take pleasure in pondering the complexities of human existence.",
-  "I enjoy engaging in profound discussions about the nature of reality."
-)
+# items with the 'depressed' attribute
+statements <- c(statements, "I frequently feel overwhelmed with sadness.",
+"Even small setbacks can greatly affect my mood.",
+"I frequently experience feelings of hopelessness and despair.",
+"I often struggle to find joy or pleasure in activities I used to enjoy.",
+"I often feel like there is a dark cloud hanging over me.",
+"I struggle to find a sense of purpose or meaning in my daily activities.",
+"I often struggle to see the point in going on each day.",
+"I find it hard to shake off feelings of sadness and despair.",
+"I often feel like everything is pointless and bleak.",
+"I frequently struggle to find motivation to get out of bed in the morning.",
+"I often feel overwhelmed with sadness.",
+"I often struggle to find motivation to engage in activities I used to enjoy.",
+"I frequently feel a heavy weight of sadness pressing down on me.",
+"I frequently experience a deep sense of sadness that lingers throughout the day.",
+"I often feel emotionally drained and devoid of energy for no apparent reason.")
+
+# add the appropriate type and attribute label
+type <- c(type, rep("neuroticism", 15))
+attribute <- c(attribute, rep("depressed", 15))
 
 
-extraversion_statements <- c( # items that target extraversion
-  "I am someone who easily strikes up conversations with strangers in social settings.", "I tend to make friends wherever I go due to my sociable nature.",
-  "I approach challenges with a can-do attitude and optimism.", "I always see the silver lining in difficult situations.",
-  "I am not afraid to speak my mind and assert my opinions in group discussions.", "I have no problem taking the lead in group projects or activities.",
-  "I always bring high levels of energy and enthusiasm to social gatherings.", "I thrive in dynamic and fast-paced environments due to my energized nature.",
-  "I am known for my warm and welcoming demeanor towards others at social events.", "I never shy away from offering a helping hand or a listening ear to those in need.",
-  "I maintain a cheerful outlook on life, spreading optimism wherever I go.", "I always find the good in people and situations, even in challenging times.",
-  "I confidently express my thoughts and ideas in professional settings.", "I am not hesitant to take charge and make decisions when needed.",
-  "I am always on the go, seeking new adventures and experiences.", "My boundless energy and enthusiasm are contagious to those around me.",
-  "I am quick to offer a smile and strike up conversations with strangers.", "I am often described as someone who radiates warmth and friendliness.",
-  "I have a natural talent for seeing the bright side of any situation.", "My optimism and positivity are infectious to those around me.",
-  "I am not afraid to speak up and advocate for what I believe in.", "Others see me as someone who confidently asserts my opinions.",
-  "My high energy levels and enthusiasm are apparent in all that I do.", "I thrive in fast-paced environments due to my energized nature.",
-  "I am always eager to make new friends and build connections.", "Others often describe me as approachable and easy to talk to.",
-  "I bring a sense of optimism and positivity to every situation I encounter.", "My upbeat attitude and cheerful outlook are contagious to those around me.",
-  "I am not afraid to assert myself and speak up for what I believe in.", "Others see me as someone who confidently takes charge in group settings.",
-  "My boundless energy and enthusiasm are evident in all aspects of my life.", "I thrive in fast-paced environments due to my high energy levels.",
-  "I am always the first to greet new people and make them feel welcome.", "Others often describe me as kind-hearted and approachable.",
-  "My warm and approachable nature instantly puts others at ease.", "I always go out of my way to make people feel welcome and comfortable.",
-  "My cheerful outlook on life brightens up any room I enter.", "I never fail to see the good in every person I meet, no matter the circumstances.",
-  "I confidently voice my opinions and stand up for my beliefs.", "I am not afraid to take charge and lead when necessary.",
-  "I am always the life of the party, bringing high energy levels wherever I go.", "I never fail to greet strangers with a warm smile and welcoming demeanor.",
-  "Making new friends comes naturally to me, thanks to my approachable nature.", "I approach challenges with unwavering positivity and optimism.",
-  "Even in tough times, I maintain a positive outlook and focus on solutions.", "I confidently speak my mind and stand up for what I believe in.",
-  "Taking the lead in group settings is something I excel at without hesitation.", "My boundless energy and enthusiasm are evident in every interaction.",
-  "Thriving in fast-paced environments is second nature to me due to my high energy levels.", "I am always known for my warm and welcoming demeanor towards others.",
-  "I easily make friends wherever I go with my welcoming attitude.", "Others often describe me as radiating kindness and warmth.",
-  "I approach challenges with unwavering optimism and positivity.", "Even in tough times, I maintain a positive and hopeful outlook.",
-  "I confidently voice my opinions and assert myself in any situation.", "Others perceive me as someone who confidently takes charge and leads.",
-  "My high energy levels are evident in all aspects of my life.", "I thrive in fast-paced environments due to my boundless enthusiasm.",
-  "I am always known for my warm and welcoming demeanor towards others at social events.", "I tend to make friends effortlessly due to my warm demeanor.",
-  "My approachable nature makes it easy for others to connect with me.", "Spreading positivity and optimism is second nature to me.",
-  "I always focus on the bright side of any situation, no matter how challenging.", "I confidently express my opinions and assert myself when needed.",
-  "Taking the lead in discussions or projects is something I do without hesitation.", "My high energy levels infuse enthusiasm into everything I do.",
-  "I am always on the move, seeking new adventures and experiences."
-)
+# Items with the 'emotional' attribute
+statements <- c(statements, "I am easily moved to tears by sentimental moments.",
+"I often find myself experiencing intense feelings of joy or sorrow.",
+"I am easily swept away by intense emotions.",
+"I find it challenging to control my emotional reactions.",
+"I have a tendency to be deeply affected by other peoples moods.",
+"I often find myself experiencing mood swings without a clear trigger.",
+"I am easily overwhelmed by my emotions, even in mundane situations.",
+"I often feel like my mood can shift drastically without warning.",
+"I often find myself tearing up over minor incidents.",
+"I frequently experience intense emotional reactions to everyday events.",
+"I frequently seek reassurance from others to feel confident.",
+"I find myself tearing up over seemingly insignificant moments.",
+"I often experience emotional highs and lows without clear reasons.",
+"I find myself easily moved to tears by emotional situations.",
+"I frequently feel overwhelmed by intense feelings that come out of nowhere.")
 
-# Aggregate all item statements in a single vector
-items <- c(neuroticism, openness, extraversion)
+# add the appropriate type and attribute label
+type <- c(type, rep("neuroticism", 15))
+attribute <- c(attribute, rep("emotional", 15))
 
-# Create the item type label
-type <- c(rep("neuroticism", 66), rep("openness", 63), rep("extraversion", 74))
 
-# Create that attribute label
-attribute <- c(
-  # Neuroticism attributes
-  rep("anxious", 14), rep("depressed", 12), rep("insecure", 11), rep("emotional", 11),
+# add items with the 'insecure' attribute
+statements <- c(statements, "I often doubt my own abilities and decisions.",
+"I often seek reassurance from others to feel confident.",
+"I often feel inadequate compared to others.",
+"I am constantly worried about others opinions of me.",
+"I often feel like Im not good enough no matter how hard I try.",
+"I frequently worry about being rejected or abandoned by others.",
+"I frequently doubt my own self-worth and capabilities.",
+"I often feel like I dont measure up to others standards.",
+"I often compare myself unfavorably to others around me.",
+"I frequently doubt whether I am worthy of love and acceptance.",
+"I frequently doubt my own abilities and decisions.",
+"I often find it challenging to control my emotional reactions.",
+"I often doubt whether I am truly deserving of success and happiness.",
+"I frequently second-guess my social interactions, fearing I said something wrong.",
+"I frequently doubt my worth and significance in the eyes of others.",
+"I often feel like I dont belong or fit in with those around me.")
 
-  # Openness attributes
-  rep("creative", 12), rep("perceptual", 10), rep("curious", 10), rep("philosophical", 8),
+# add the appropriate type and attribute label
+type <- c(type, rep("neuroticism", 16))
+attribute <- c(attribute, rep("insecure", 16))
 
-  # Extraversion attributes
-  rep("friendly", 20), rep("positive", 12), rep("assertive", 12), rep("energetic", 10)
-)
+
+## Extraversion Items
+# Items with the 'assertive' attribute
+statements <- c(statements, "I am not afraid to speak my mind and assert my opinions in group discussions.",
+"I have no problem taking the lead in group projects or activities.",
+"I confidently express my thoughts and ideas in professional settings.",
+"I am not hesitant to take charge and make decisions when needed.",
+"I am not afraid to speak up and advocate for what I believe in.",
+"Others see me as someone who confidently asserts my opinions.",
+"I am not afraid to assert myself and speak up for what I believe in.",
+"Others see me as someone who confidently takes charge in group settings.",
+"I confidently voice my opinions and stand up for my beliefs.",
+"I am not afraid to take charge and lead when necessary.",
+"I confidently speak my mind and stand up for what I believe in.",
+"Taking the lead in group settings is something I excel at without hesitation.",
+"I confidently voice my opinions and assert myself in any situation.",
+"Others perceive me as someone who confidently takes charge and leads.",
+"I confidently express my opinions and assert myself when needed.",
+"Taking the lead in discussions or projects is something I do without hesitation.")
+
+# add the appropriate type and attribute label
+type <- c(type, rep("extraversion", 16))
+attribute <- c(attribute, rep("assertive", 16))
+
+# Items with the 'friendly' attribute
+statements <- c(statements, "I am someone who easily strikes up conversations with strangers in social settings.",
+"I tend to make friends wherever I go due to my sociable nature.",
+"I am known for my warm and welcoming demeanor towards others at social events.",
+"I never shy away from offering a helping hand or a listening ear to those in need.",
+"I am quick to offer a smile and strike up conversations with strangers.",
+"I am often described as someone who radiates warmth and friendliness.",
+"I am always eager to make new friends and build connections.",
+"Others often describe me as approachable and easy to talk to.",
+"I am always the first to greet new people and make them feel welcome.",
+"Others often describe me as kind-hearted and approachable.",
+"My warm and approachable nature instantly puts others at ease.",
+"I always go out of my way to make people feel welcome and comfortable.",
+"I never fail to greet strangers with a warm smile and welcoming demeanor.",
+"Making new friends comes naturally to me, thanks to my approachable nature.",
+"I am always known for my warm and welcoming demeanor towards others.",
+"I easily make friends wherever I go with my welcoming attitude.",
+"Others often describe me as radiating kindness and warmth.",
+"I am always known for my warm and welcoming demeanor towards others at social events.",
+"I tend to make friends effortlessly due to my warm demeanor.",
+"My approachable nature makes it easy for others to connect with me.")
+
+# add the appropriate type and attribute label
+type <- c(type, rep("extraversion", 20))
+attribute <- c(attribute, rep("friendly", 20))
+
+
+# Add items with the 'energetic' attribute
+statements <- c( statements, "I always bring high levels of energy and enthusiasm to social gatherings.",
+"I thrive in dynamic and fast-paced environments due to my energized nature.",
+"I am always on the go, seeking new adventures and experiences.",
+"My boundless energy and enthusiasm are contagious to those around me.",
+"My high energy levels and enthusiasm are apparent in all that I do.",
+"I thrive in fast-paced environments due to my energized nature.",
+"My boundless energy and enthusiasm are evident in all aspects of my life.",
+"I thrive in fast-paced environments due to my high energy levels.",
+"I am always the life of the party, bringing high energy levels wherever I go.",
+"My boundless energy and enthusiasm are evident in every interaction.",
+"Thriving in fast-paced environments is second nature to me due to my high energy levels.",
+"My high energy levels are evident in all aspects of my life.",
+"I thrive in fast-paced environments due to my boundless enthusiasm.",
+"My high energy levels infuse enthusiasm into everything I do.",
+"I am always on the move, seeking new adventures and experiences.")
+
+# add the appropriate type and attribute label
+type <- c(type, rep("extraversion", 15))
+attribute <- c(attribute, rep("energetic", 15))
 
 
 # Build the data frame with three columns: statement, type, and attribute
-my.personality.items <- data.frame(statement = items,
+my.personality.items <- data.frame(statement = statements,
                                     type = type,
                                     attribute = attribute)
 
 # Run Genie to validate and redundancy-check an existing item pool
 my.personality.inventory.results <- GENIE(items = my.personality.items,
-                                         openai.API = key)
+                                         openai.API = key,
+                                         EGA.model = "tmfg")
 
 # View the final item pool
 View(my.personality.inventory.results$main_result)
