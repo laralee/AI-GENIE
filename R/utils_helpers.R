@@ -40,7 +40,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       definition <- paste0("Definition of '", current_type, "': ", definition, "\n")
     }
 
-    # Construct the prompt
+    # Construct the prompt for all prompts
     user.prompts[[current_type]] <- paste0(
       definition,
       "Generate a total of ", length(attributes) * 2, " UNIQUE, psychometrically reliable and valid ",
