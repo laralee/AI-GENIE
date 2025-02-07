@@ -47,6 +47,8 @@ A list containing:
 \item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
 \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 \item{\code{embeddings}}{The embeddings generated for the items.}
+\item{\code {sparse_embeddings}}{The sparsifies embeddings generated for the items}
+\item{\code {embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
 \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
 \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}

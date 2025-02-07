@@ -320,6 +320,8 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #'   \item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
 #'   \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 #'   \item{\code{embeddings}}{The embeddings generated for the items.}
+#'   \item{\code {sparse_embeddings}}{The sparsifies embeddings generated for the items}
+#'   \item{\code {embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
 #'   \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 #'   \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
 #'   \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
@@ -476,10 +478,27 @@ run_pipeline <- function(items, openai.key,
   if(keep.org){
     overall_result[["all_item_embeddings"]] <- all_embeds
     overall_result[["original_items"]] <- items
+
+    # include sparse embeddings
+    embedding_sparse <- as.matrix(all_embeds)
+    percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+    embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+    overall_result[["all_item_embeddings_sparse"]] <- embedding_sparse
   }
 
   overall_result[["embeddings"]] <- embeddings_reduced
 
+  # include sparse embeddings
+  embedding_sparse <- as.matrix(embeddings_reduced)
+  percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+  embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+  overall_result[["sparse_embeddings"]] <- embedding_sparse
+
+  if(overall_result$embedding_type=="full"){
+    overall_result[["embeddings_used"]] <- embeddings_reduced
+  } else if (overall_result$embedding_type=="sparse"){
+    overall_result[["embeddings_used"]] <- embedding_sparse
+  }
 
   if(plot){
     plot(complied_results$network_plot)
