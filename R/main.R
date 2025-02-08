@@ -24,6 +24,7 @@
 #' @param items.only Logical; defaults to `FALSE`. Set to `TRUE` if you only want the items generated without further processing. When `TRUE`, item pool reduction through AI-GENIE is skipped, and the function returns a data frame of the generated items.
 #' @param adaptive Logical; defaults to `TRUE`. Indicates whether to use an adaptive prompting approach (recommended). When `TRUE`, the language model receives a list of previously generated items to avoid redundancy. Set to `FALSE` to skip this step if context length is a concern.
 #' @param EGA.model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
+#' @param embedding.model A character string specifying the OpenAI embedding model that should be used. The options are `"text-embedding-3-small"`, `"text-embedding-3-large"`, or `"text-embedding-ada-002"`. Defaults to `"text-embedding-3-small"`.
 #' @param keep.org Logical; defaults to `FALSE`. When `TRUE`, returns a data frame of the original item pool.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display the main summary network plots.
 #' @param plot.stability Logical; defaults to `FALSE`. Specifies whether to display the secondary network stability plots.
@@ -38,7 +39,7 @@
   #'   \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
   #'   \item{\code{embeddings}}{The embeddings generated for the items.}
   #'   \item{\code{sparse_embeddings}}{The sparsified embeddings generated for the items}
-  #'   \item{\code {embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
+  #'   \item{\code{embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
   #'   \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
   #'   \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
   #'   \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
@@ -212,8 +213,8 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
                     cleaning.fun = NULL, system.role = NULL,
                     scale.title = NULL, sub.domain = NULL, model = "gpt3.5", item.examples = NULL,
                     target.N = 100, temperature = 1, top.p = 1, items.only = FALSE, adaptive = TRUE,
-                    EGA.model = NULL, keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
-                    calc.final.stability = FALSE, silently = FALSE, ...) {
+                    EGA.model = NULL, embedding.model = "text-embedding-3-small", keep.org = FALSE,
+                    plot = TRUE, plot.stability = FALSE, calc.final.stability = FALSE, silently = FALSE, ...) {
 
   # Perform input validation
   validated_params <- AIGENIE_checks(
@@ -235,6 +236,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
     items.only = items.only,
     adaptive = adaptive,
     EGA.model = EGA.model,
+    embedding.model = embedding.model,
     keep.org = keep.org,
     plot = plot,
     plot.stability = plot.stability,
@@ -243,24 +245,50 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
     ...
   )
 
+  # Reassign parameters
+  item.attributes <- validated_params$item.attributes
+  openai.API <- validated_params$openai.API
+  groq.API <- validated_params$groq.API
+  custom <- validated_params$custom
+  user.prompts <- validated_params$user.prompts
+  item.type.definitions <- validated_params$item.type.definitions
+  cleaning.fun <- validated_params$cleaning.fun
+  system.role <- validated_params$system.role
+  scale.title <- validated_params$scale.title
+  sub.domain <- validated_params$sub.domain
+  model <- validated_params$model
+  item.examples <- validated_params$item.examples
+  target.N <- validated_params$target.N
+  temperature <- validated_params$temperature
+  top.p <- validated_params$top.p
+  items.only <- validated_params$items.only
+  adaptive <- validated_params$adaptive
+  EGA.model <- validated_params$EGA.model
+  embedding.model <- validated_params$embedding.model
+  keep.org <- validated_params$keep.org
+  plot <- validated_params$plot
+  plot.stability <- validated_params$plot.stability
+  calc.final.stability <- validated_params$calc.final.stability
+  silently <- validated_params$silently
+
     generated_items <- generate.items.internal(
-      model = validated_params$model,
-      temperature = validated_params$temperature,
-      top.p = validated_params$top.p,
-      groq.API = validated_params$groq.API,
-      openai.API = validated_params$openai.API,
-      target.N = validated_params$target.N,
-      item.attributes = validated_params$item.attributes,
-      scale.title = validated_params$scale.title,
-      sub.domain = validated_params$sub.domain,
-      item.examples = validated_params$item.examples,
-      system.role = validated_params$system.role,
-      user.prompts = validated_params$user.prompts,
-      item.type.definitions = validated_params$item.type.definitions,
+      model = model,
+      temperature = temperature,
+      top.p = top.p,
+      groq.API = groq.API,
+      openai.API = openai.API,
+      target.N = target.N,
+      item.attributes = item.attributes,
+      scale.title = scale.title,
+      sub.domain = sub.domain,
+      item.examples = item.examples,
+      system.role = system.role,
+      user.prompts = user.prompts,
+      item.type.definitions = item.type.definitions,
       cleaner_fun = cleaning.fun,
-      custom = validated_params$custom,
-      adaptive = validated_params$adaptive,
-      silently = validated_params$silently,
+      custom = custom,
+      adaptive = adaptive,
+      silently = silently,
       ...
     )
 
@@ -283,6 +311,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
     openai.key = validated_params$openai.API,
     title = scale.title,
     EGA.model = EGA.model,
+    embedding.model = embedding.model,
     keep.org = keep.org,
     plot = plot,
     plot.stability = plot.stability,

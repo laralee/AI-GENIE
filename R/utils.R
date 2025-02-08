@@ -320,8 +320,8 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #'   \item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
 #'   \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 #'   \item{\code{embeddings}}{The embeddings generated for the items.}
-#'   \item{\code {sparse_embeddings}}{The sparsifies embeddings generated for the items}
-#'   \item{\code {embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
+#'   \item{\code{sparse_embeddings}}{The sparsifies embeddings generated for the items}
+#'   \item{\code{embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
 #'   \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 #'   \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
 #'   \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
@@ -332,7 +332,9 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #' }
 run_pipeline <- function(items, openai.key,
                          title = "Networks Before and After AI-Genie",
-                         EGA.model= NULL, keep.org = FALSE,
+                         EGA.model= NULL,
+                         embedding.model,
+                         keep.org = FALSE,
                          plot = TRUE, plot.stability = FALSE, calc.final.stability,
                          silently = FALSE, ...){
 
@@ -356,7 +358,9 @@ run_pipeline <- function(items, openai.key,
 
   for (i in 1:length(trait_type_indices)){
   item_type <- names(trait_type_indices)[[i]]
-  results <- get_results(items=items[trait_type_indices[[i]],], EGA.model=EGA.model, openai.key = openai.key, item_type=item_type,
+  results <- get_results(items=items[trait_type_indices[[i]],], EGA.model=EGA.model,
+                         embedding.model = embedding.model,
+                         openai.key = openai.key, item_type=item_type,
                          keep.org=keep.org,silently = silently)
   curr_embeds <- results[["embeddings"]]
   results <- results[["result"]]
@@ -451,7 +455,6 @@ run_pipeline <- function(items, openai.key,
       final_bootega_obj = complied_results$final_bootstrap,
       initial_ega_obj = complied_results$before_ega,
       initial_bootega_obj = complied_results$initial_bootstrap,
-      embedding_type = complied_results$embedding_type,
       selected_model = complied_results$model_used,
       nmi = complied_results$final_nmi,
       start_nmi = complied_results$before_nmi,
@@ -465,7 +468,6 @@ run_pipeline <- function(items, openai.key,
       main_result = complied_results$items_reduced,
       final_ega_obj = complied_results$final_ega,
       initial_ega_obj = complied_results$before_ega,
-      embedding_type = complied_results$embedding_type,
       selected_model = complied_results$model_used,
       nmi = complied_results$final_nmi,
       start_nmi = complied_results$before_nmi,
@@ -476,28 +478,44 @@ run_pipeline <- function(items, openai.key,
   }
 
   if(keep.org){
-    overall_result[["all_item_embeddings"]] <- all_embeds
-    overall_result[["original_items"]] <- items
-
-    # include sparse embeddings
+    # include sparse embeddings - all items
     embedding_sparse <- as.matrix(all_embeds)
     percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
     embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
-    overall_result[["all_item_embeddings_sparse"]] <- embedding_sparse
-  }
 
-  overall_result[["embeddings"]] <- embeddings_reduced
+
+    # include sparse embeddings - selected items
+    embedding_sparse_selected <- as.matrix(embeddings_reduced)
+    percentiles <- quantile(embedding_sparse_selected, probs = c(0.025, 0.975))
+    embedding_sparse_selected[embedding_sparse_selected > percentiles[1] & embedding_sparse_selected < percentiles[2]] <- 0
+
+
+    # Build return object
+    embeddings_list <- list(original_sample_full = as.matrix(all_embeds),
+                            original_sample_sparse = as.matrix(embedding_sparse),
+                            full = as.matrix(embeddings_reduced),
+                            sparse = as.matrix(embedding_sparse_selected),
+                            embed_type_used = complied_results$embedding_type)
+
+    # Add the original items and embeds
+    overall_result[["original_sample_items"]] <- items
+    overall_result[["embeddings"]] <- embeddings_list
+
+  } else{
 
   # include sparse embeddings
   embedding_sparse <- as.matrix(embeddings_reduced)
   percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
   embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
-  overall_result[["sparse_embeddings"]] <- embedding_sparse
 
-  if(overall_result$embedding_type=="full"){
-    overall_result[["embeddings_used"]] <- embeddings_reduced
-  } else if (overall_result$embedding_type=="sparse"){
-    overall_result[["embeddings_used"]] <- embedding_sparse
+  # Build return object
+  embeddings_list <- list(full = as.matrix(embeddings_reduced),
+                          sparse = as.matrix(embedding_sparse),
+                          embed_type_used = complied_results$embedding_type)
+
+  # Add embeds return object
+  overall_result[["embeddings"]] <- embeddings_list
+
   }
 
   if(plot){

@@ -243,13 +243,39 @@ validate_target_N <- function(target.N, labels, items.only) {
 #' Validates the \code{EGA.model} parameter to ensure it is either \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.
 #'
 #' @param EGA.model A character string specifying the model to be used with EGA, one of \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.
-#' @return No return value; the function stops with an error message if validation fails.
+#' @return EGA.model string in lowercase; the function stops with an error message if validation fails.
 validate_EGA_model <- function(EGA.model){
   if(!is.null(EGA.model)){
+    if(is.character(EGA.model)){
+    EGA.model <- trimws(tolower(EGA.model))
     if(EGA.model != "tmfg" && EGA.model != "glasso"){
       stop("EGA.model must either be 'tmfg', 'glasso', or NULL.")
     }
+    } else {
+      stop("EGA.model must be a character string.")
+    }
+
   }
+  return(EGA.model)
+}
+
+#' Validate Embedding Model
+#'
+#' Validates the \code{embedding.model} parameter to ensure it is either \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}.
+#'
+#' @param embedding A character string specifying the model to be used when embedding, one of  \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}.
+#' @return embedding string in lowercase; the function stops with an error message if validation fails.
+validate_embedding <- function(embedding){
+  if(is.character(embedding)){
+    embedding <- trimws(tolower(embedding))
+    if(embedding != "text-embedding-3-small" && embedding != "text-embedding-3-large" && embedding != "text-embedding-ada-002"){
+      stop("embedding.model must either be 'text-embedding-3-small', 'text-embedding-3-large', or 'text-embedding-ada-002'.")
+    }
+  } else {
+    stop("embedding.model must be a character string.")
+  }
+
+  return(embedding)
 }
 
 

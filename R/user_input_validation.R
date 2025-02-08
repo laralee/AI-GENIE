@@ -22,6 +22,7 @@
 #' @param items.only Logical; if \code{TRUE}, only items are generated without further analysis.
 #' @param adaptive Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items.
 #' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param embedding.model A character string specifying the OpenAI embedding model that should be used. The options are `"text-embedding-3-small"`, `"text-embedding-3-large"`, or `"text-embedding-ada-002"`. Defaults to `"text-embedding-3-small"`.
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results.
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
 #' @param plot.stability Logical; Specifies whether to display the secondary network stability plots.
@@ -32,15 +33,15 @@
 AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
                            user.prompts, item.type.definitions, cleaning.fun, system.role,
                            scale.title, sub.domain, model, item.examples,
-                           target.N, temperature, top.p, items.only, adaptive, EGA.model,
+                           target.N, temperature, top.p, items.only, adaptive, EGA.model, embedding.model,
                            keep.org, plot, plot.stability, calc.final.stability, silently, ...) {
 
   # Check for missing arguments (no NA values)
   check_no_na(item.attributes, openai.API, groq.API, custom,
               user.prompts, item.type.definitions, cleaning.fun, system.role,
               scale.title, sub.domain, model, item.examples,
-              target.N, temperature, top.p, items.only, adaptive, EGA.model, keep.org,
-              plot, plot.stability, calc.final.stability, silently)
+              target.N, temperature, top.p, items.only, adaptive, EGA.model, embedding.model,
+              keep.org, plot, plot.stability, calc.final.stability, silently)
 
   # Validate that 'silently' is a boolean
   if (!is.logical(silently) || length(silently) != 1) {
@@ -68,7 +69,10 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   }
 
   # Validate EGA.model
-  validate_EGA_model(EGA.model)
+  EGA.model <- validate_EGA_model(EGA.model)
+
+  # Validate embedding.model
+  embedding.model <- validate_embedding(embedding.model)
 
   # Validate scale.title and sub.domain
   scale.title <- validate_title_or_domain(scale.title, "scale title")
@@ -123,11 +127,12 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 
   # Return everything
   return(list(
-    item.attributes=item.attributes, openai.API=openai.API, groq.API=groq.API, custom=custom,
-    user.prompts=user.prompts, item.type.definitions=item.type.definitions, cleaning.fun=cleaning.fun,
-    system.role=system.role, scale.title=scale.title, sub.domain=sub.domain, model=model, item.examples=item.examples,
-    target.N=target.N, temperature=temperature, top.p=top.p, items.only=items.only, adaptive=adaptive, EGA.model=EGA.model,
-    keep.org=keep.org, plot=plot, silently=silently
+    item.attributes = item.attributes, openai.API = openai.API, groq.API = groq.API, custom = custom,
+    user.prompts = user.prompts, item.type.definitions=item.type.definitions, cleaning.fun=cleaning.fun, system.role=system.role,
+    scale.title=scale.title, sub.domain=sub.domain, model=model, item.examples=item.examples,
+    target.N=target.N, temperature=temperature, top.p=top.p, items.only=items.only, adaptive=adaptive, EGA.model=EGA.model, embedding.model=embedding.model,
+    keep.org=keep.org, plot=plot, plot.stability=plot.stability, calc.final.stability=calc.final.stability, silently=silently
+
     ))
 }
 

@@ -209,7 +209,7 @@ try_formats <- function(response, split_content, ...) {
 #' @param dimensions An optional integer specifying the number of dimensions for the embeddings. Defaults to \code{1536}.
 #' @param openai.key A character string of your OpenAI API key.
 #' @return A matrix of embeddings where each column corresponds to an item statement.
-get_embeddings <- function(items, dimensions = NULL, openai.key, ...)
+get_embeddings <- function(items, embedding.model, dimensions = NULL, openai.key, ...)
 {
 
   # Set up OpenAI
@@ -218,7 +218,7 @@ get_embeddings <- function(items, dimensions = NULL, openai.key, ...)
 
   # Generate embeddings
   word_embeddings <- openai$Embedding$create(
-    model = "text-embedding-3-small",
+    model = embedding.model,
     input = items$statement,
     dimensions = ifelse(
       is.null(dimensions), 1536L, # default
@@ -366,7 +366,7 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, ..
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
-get_results <- function(items, EGA.model, openai.key, item_type, keep.org, silently, ...) {
+get_results <- function(items, EGA.model, embedding.model, openai.key, item_type, keep.org, silently, ...) {
 
   # Define the possible models
   possible_models <- c("tmfg", "glasso")
@@ -377,7 +377,7 @@ get_results <- function(items, EGA.model, openai.key, item_type, keep.org, silen
     cat(paste0("Starting AI-GENIE Reduction Analysis for ", item_type," items..."))
   }
 
-  embedding <- get_embeddings(items, openai.key = openai.key)
+  embedding <- get_embeddings(items, embedding.model, openai.key = openai.key)
 
   if(!silently){
     cat(" embeddings obtained...")
@@ -468,7 +468,7 @@ flatten_text <- function(text)
 print_results<-function(obj){
   EGA.model <- obj[["selected_model"]]
   before_nmi <- obj[["start_nmi"]]
-  embedding_type <- obj[["embedding_type"]]
+  embedding_type <- obj[["embeddings"]][["embed_type_used"]]
   after_genie <- obj[["nmi"]]
   initial_items <- obj[["start_N"]]
   final_items <- obj[["final_N"]]
