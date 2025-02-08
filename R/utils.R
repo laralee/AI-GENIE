@@ -528,6 +528,49 @@ run_pipeline <- function(items, openai.key,
 
   print_results(overall_result)
 
+  # add the appropriate embedding vectors to the item-level results
+  for (item.type in names(item_level_results)){
+    embedding_list <- list()
+
+    IDs <- items$type==item.type
+
+    if(keep.org){
+      # sparsify all embeds
+      embedding_sparse <- as.matrix(all_embeds)
+      percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+      embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+
+      embedding_list[["original_sample_full"]] <- as.matrix(all_embeds)[IDs]
+      embedding_list[["original_sample_sparse"]] <- embedding_sparse[IDs]
+
+      # sparsify selected embeds
+      embedding_sparse <- as.matrix(embeddings_reduced)
+      percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+      embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+
+      embedding_list[["full"]] <- as.matrix(embeddings_reduced)[IDs]
+      embedding_list[["sparse"]] <- embedding_sparse[IDs]
+
+    } else {
+      # sparsify selected embeds
+      embedding_sparse <- as.matrix(embeddings_reduced)
+      percentiles <- quantile(embedding_sparse, probs = c(0.025, 0.975))
+      embedding_sparse[embedding_sparse > percentiles[1] & embedding_sparse < percentiles[2]] <- 0
+
+      embedding_list[["full"]] <- as.matrix(embeddings_reduced)[IDs]
+      embedding_list[["sparse"]] <- embedding_sparse[IDs]
+
+    }
+
+    # add the embedding type to the list
+    embedding_list[["embed_type_used"]] <- item_level_results[[item.type]]$embedding_type
+
+    # drop the embedding type from the overall object
+    item_level_results[[item.type]]$embedding_type <- NULL
+
+    item_level_results[[item.type]][["embeddings"]] <- embedding_list
+  }
+
   return(list(overall_sample = overall_result,
               item_type_level = item_level_results))
 }
