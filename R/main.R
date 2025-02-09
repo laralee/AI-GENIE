@@ -713,6 +713,7 @@ GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap",
 #'   # Print the output to inspect its format
 #'   print(test_output)
 #' }
+#' @export
 validate_prompt <- function(openai.API=NULL, groq.API = NULL,
                             user.prompts = NULL, N.runs = 3,
                             model="gpt3.5", top.p=1, temperature=1,
