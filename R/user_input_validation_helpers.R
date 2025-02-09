@@ -966,3 +966,19 @@ validate_apis <- function(openai.API, groq.API, model){
 
   return(list(openai.API = openai.API, groq.API = groq.API))
 }
+
+
+validate_EGA_algorithm <- function(EGA.algorithm){
+  if(!is.character(EGA.algorithm)){
+    stop("EGA.algorithm must be a valid string. One of 'walktrap', 'louvain', or 'leiden'.")
+  } else {
+    EGA.algorithm <- tolower(EGA.algorithm)
+    EGA.algorithm <- gsub("\\s+", "", EGA.algorithm)
+
+    if(EGA.algorithm != "louvain" && EGA.algorithm != "walktrap" && EGA.algorithm != "leiden"){
+      stop("EGA.algorithm must be one of 'walktrap', 'louvain', or 'leiden'.")
+    }
+
+  }
+  return(EGA.algorithm)
+}

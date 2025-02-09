@@ -33,14 +33,14 @@
 AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
                            user.prompts, item.type.definitions, cleaning.fun, system.role,
                            scale.title, sub.domain, model, item.examples,
-                           target.N, temperature, top.p, items.only, adaptive, EGA.model, embedding.model,
+                           target.N, temperature, top.p, items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
                            keep.org, plot, plot.stability, calc.final.stability, silently, ...) {
 
   # Check for missing arguments (no NA values)
   check_no_na(item.attributes, openai.API, groq.API, custom,
               user.prompts, item.type.definitions, cleaning.fun, system.role,
               scale.title, sub.domain, model, item.examples,
-              target.N, temperature, top.p, items.only, adaptive, EGA.model, embedding.model,
+              target.N, temperature, top.p, items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
               keep.org, plot, plot.stability, calc.final.stability, silently)
 
   # Validate that 'silently' is a boolean
@@ -70,6 +70,9 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 
   # Validate EGA.model
   EGA.model <- validate_EGA_model(EGA.model)
+
+  # Validate EGA.algorithm
+  EGA.algorithm <- validate_EGA_algorithm(EGA.algorithm)
 
   # Validate embedding.model
   embedding.model <- validate_embedding(embedding.model)
@@ -130,7 +133,7 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
     item.attributes = item.attributes, openai.API = openai.API, groq.API = groq.API, custom = custom,
     user.prompts = user.prompts, item.type.definitions=item.type.definitions, cleaning.fun=cleaning.fun, system.role=system.role,
     scale.title=scale.title, sub.domain=sub.domain, model=model, item.examples=item.examples,
-    target.N=target.N, temperature=temperature, top.p=top.p, items.only=items.only, adaptive=adaptive, EGA.model=EGA.model, embedding.model=embedding.model,
+    target.N=target.N, temperature=temperature, top.p=top.p, items.only=items.only, adaptive=adaptive, EGA.model=EGA.model,EGA.algorithm=EGA.algorithm, embedding.model=embedding.model,
     keep.org=keep.org, plot=plot, plot.stability=plot.stability, calc.final.stability=calc.final.stability, silently=silently
 
     ))
@@ -158,9 +161,12 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #'   \item{\code{items}}{A cleaned and validated data frame of your item data.}
 #'   \item{\code{openai.API}}{Your validated OpenAI API key.}
 #' }
-GENIE_checks <- function(item.data, openai.API, EGA.model, plot, plot.stability, calc.final.stability, silently) {
+GENIE_checks <- function(item.data, openai.API, EGA.model,EGA.algorithm, embedding.model,
+                         plot, plot.stability, calc.final.stability, silently) {
 
-  check_no_na(item.data, openai.API, plot, silently, plot.stability, calc.final.stability, EGA.model)
+  # Ensure there is no missingness
+  check_no_na(item.data, openai.API, EGA.model,EGA.algorithm, embedding.model,
+              plot, plot.stability, calc.final.stability, silently)
 
   # quickly validate booleans
   if(!(plot==FALSE || plot==TRUE)){stop("'plot' must be a boolean.")}
@@ -168,7 +174,14 @@ GENIE_checks <- function(item.data, openai.API, EGA.model, plot, plot.stability,
   if(!(plot.stability==FALSE || plot.stability==TRUE)){stop("'plot.stability' must be a boolean.")}
   if(!(calc.final.stability==FALSE || calc.final.stability==TRUE)){stop("'calc.final.stability' must be a boolean.")}
 
-  validate_EGA_model(EGA.model)
+  # Validate the EGA model
+  EGA.model <- validate_EGA_model(EGA.model)
+
+  # Validate the EGA algorithm
+  EGA.algorithm <- validate_EGA_algorithm(EGA.algorithm)
+
+  # Validate the embedding model
+  embedding.model <- validate_embedding(embedding.model)
 
   # validate the API
   openai.API <- validate_openai(openai.API)
@@ -204,7 +217,8 @@ GENIE_checks <- function(item.data, openai.API, EGA.model, plot, plot.stability,
   }
 
   # Return the cleaned item data object
-  return(list(items = item.data, openai.API=openai.API, item.attributes = item.attributes))
+  return(list(items = item.data, openai.API=openai.API, item.attributes = item.attributes,
+              embedding.model=embedding.model, EGA.model=EGA.model, EGA.algorithm = EGA.algorithm))
 }
 
 

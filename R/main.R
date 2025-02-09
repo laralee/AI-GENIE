@@ -24,6 +24,7 @@
 #' @param items.only Logical; defaults to `FALSE`. Set to `TRUE` if you only want the items generated without further processing. When `TRUE`, item pool reduction through AI-GENIE is skipped, and the function returns a data frame of the generated items.
 #' @param adaptive Logical; defaults to `TRUE`. Indicates whether to use an adaptive prompting approach (recommended). When `TRUE`, the language model receives a list of previously generated items to avoid redundancy. Set to `FALSE` to skip this step if context length is a concern.
 #' @param EGA.model A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are `"tmfg"` or `"glasso"`. Defaults to `tmfg`. If set to `NULL`, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.
+#' @param EGA.algorithm A character string specifying the clustering algorithm to use with Exploratory Graph Analysis (EGA). Options are `"leiden"`, `"louvain"`, or `"walktrap"`. Defaults to `"walktrap"`.
 #' @param embedding.model A character string specifying the OpenAI embedding model that should be used. The options are `"text-embedding-3-small"`, `"text-embedding-3-large"`, or `"text-embedding-ada-002"`. Defaults to `"text-embedding-3-small"`.
 #' @param keep.org Logical; defaults to `FALSE`. When `TRUE`, returns a data frame of the original item pool.
 #' @param plot Logical; defaults to `TRUE`. Specifies whether to display the main summary network plots.
@@ -213,7 +214,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
                     cleaning.fun = NULL, system.role = NULL,
                     scale.title = NULL, sub.domain = NULL, model = "gpt3.5", item.examples = NULL,
                     target.N = 100, temperature = 1, top.p = 1, items.only = FALSE, adaptive = TRUE,
-                    EGA.model = NULL, embedding.model = "text-embedding-3-small", keep.org = FALSE,
+                    EGA.model = NULL, EGA.algorithm="walktrap", embedding.model = "text-embedding-3-small", keep.org = FALSE,
                     plot = TRUE, plot.stability = FALSE, calc.final.stability = FALSE, silently = FALSE, ...) {
 
   # Perform input validation
@@ -236,6 +237,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
     items.only = items.only,
     adaptive = adaptive,
     EGA.model = EGA.model,
+    EGA.algorithm = EGA.algorithm,
     embedding.model = embedding.model,
     keep.org = keep.org,
     plot = plot,
@@ -264,6 +266,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
   items.only <- validated_params$items.only
   adaptive <- validated_params$adaptive
   EGA.model <- validated_params$EGA.model
+  EGA.algorithm <- validated_params$EGA.algorithm
   embedding.model <- validated_params$embedding.model
   keep.org <- validated_params$keep.org
   plot <- validated_params$plot
@@ -311,6 +314,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
     openai.key = validated_params$openai.API,
     title = scale.title,
     EGA.model = EGA.model,
+    EGA.algorithm = EGA.algorithm,
     embedding.model = embedding.model,
     keep.org = keep.org,
     plot = plot,
@@ -543,17 +547,21 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' # View the final item pool
 #' View(my.personality.inventory.results$main_result)
 #' }
-GENIE <- function(items, openai.API, EGA.model=NULL, plot=TRUE, plot.stability = FALSE, calc.final.stability=FALSE, silently=FALSE, ...) {
+GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap", embedding.model="text-embedding-3-small", plot=TRUE, plot.stability = FALSE, calc.final.stability=FALSE, silently=FALSE, ...) {
 
   # check the user-provided items
-  checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA.model=EGA.model,
+  checks <- GENIE_checks(item.data=items, openai.API=openai.API, EGA.model=EGA.model,EGA.algorithm = EGA.algorithm, embedding.model=embedding.model,
                          plot=plot, plot.stability= plot.stability, calc.final.stability= calc.final.stability, silently=silently)
   openai.API <- checks[["openai.API"]]
   items <- checks[["items"]]
   item.attributes <- checks[["item.attributes"]]
+  EGA.model <- checks[["EGA.model"]]
+  EGA.algorithm <- checks[["EGA.algorithm"]]
+  embedding.model <- checks[["embedding.model"]]
 
   # run the pipeline
-  run_pipeline <- run_pipeline(items = items, EGA.model = EGA.model,openai.key=openai.API,
+  run_pipeline <- run_pipeline(items = items, EGA.model = EGA.model, EGA.algorithm= EGA.algorithm,
+                               openai.key=openai.API, embedding.model=embedding.model,
                                labels = items$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
                                silently= silently, calc.final.stability = calc.final.stability)
 

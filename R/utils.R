@@ -386,6 +386,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 run_pipeline <- function(items, openai.key,
                          title = "Networks Before and After AI-Genie",
                          EGA.model= NULL,
+                         EGA.algorithm,
                          embedding.model,
                          keep.org = FALSE,
                          plot = TRUE, plot.stability = FALSE, calc.final.stability,
@@ -412,6 +413,7 @@ run_pipeline <- function(items, openai.key,
   for (i in 1:length(trait_type_indices)){
   item_type <- names(trait_type_indices)[[i]]
   results <- get_results(items=items[trait_type_indices[[i]],], EGA.model=EGA.model,
+                         EGA.algorithm=EGA.algorithm,
                          embedding.model = embedding.model,
                          openai.key = openai.key, item_type=item_type,
                          keep.org=keep.org,silently = silently)
@@ -497,6 +499,7 @@ run_pipeline <- function(items, openai.key,
                                               truth_reduced = truth_reduced,
                                               truth = all_truth,
                                               EGA.model = EGA.model,
+                                              EGA.algorithm = EGA.algorithm,
                                               title=title,
                                               calc.final.stability = calc.final.stability,
                                               silently = silently)

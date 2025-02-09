@@ -300,7 +300,7 @@ remove_redundancies <- function(embedding, ...)
 #' @param cut.off Numeric; the stability cutoff value. Defaults to \code{0.75}.
 #' @param ... Additional arguments passed to the \code{\link[EGAnet]{bootEGA}} function.
 #' @return A data matrix or data frame with unstable items removed.
-remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, ...)
+remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, EGA.algorithm, ...)
 {
   if (verbose){
     cat("\n")
@@ -311,7 +311,7 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, ..
 
   # BootEGA
   bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                               verbose = verbose, model=model, seed=seed)
+                               verbose = verbose, model=model, algorithm=EGA.algorithm,seed=seed)
   boot1 <- bootstrap
 
   current_boot <- NULL
@@ -329,7 +329,7 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, ..
     # BootEGA
     bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE,
                                  plot.itemStability = FALSE, verbose = verbose,
-                                 model=model, seed=seed)
+                                 model=model, algorithm=EGA.algorithm, seed=seed)
 
     current_boot <- bootstrap
   }
@@ -366,7 +366,7 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, ..
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
-get_results <- function(items, EGA.model, embedding.model, openai.key, item_type, keep.org, silently, ...) {
+get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai.key, item_type, keep.org, silently, ...) {
 
   # Define the possible models
   possible_models <- c("tmfg", "glasso")
@@ -389,7 +389,7 @@ get_results <- function(items, EGA.model, embedding.model, openai.key, item_type
   # If EGA.model is specified, evaluate only that model
   if (!is.null(EGA.model)) {
 
-    results[[EGA.model]] <- compute_EGA(items=items, EGA.model = EGA.model,
+    results[[EGA.model]] <- compute_EGA(items=items, EGA.model = EGA.model, EGA.algorithm=EGA.algorithm,
                                         embedding = embedding, openai.key = openai.key,
                                         silently = silently)
 
@@ -399,7 +399,7 @@ get_results <- function(items, EGA.model, embedding.model, openai.key, item_type
   } else {
     # If EGA.model is not specified, evaluate both models and select the best
     for (model in possible_models) {
-      results[[model]] <- compute_EGA(items=items, EGA.model = model,
+      results[[model]] <- compute_EGA(items=items, EGA.model = model, EGA.algorithm=EGA.algorithm,
                                       embedding = embedding, openai.key = openai.key,
                                       silently = silently)
     }
@@ -501,7 +501,7 @@ print_results<-function(obj){
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, final and initial EGA and bootEGA objects, embeddings, NMI values, and item counts before and after reduction.
-compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) {
+compute_EGA <- function(items, EGA.model, EGA.algorithm, embedding, openai.key, silently, ...) {
   if(!silently){
     cat("\n")
     cat(paste0("Computing EGA steps using ", EGA.model, "..."))
@@ -519,7 +519,7 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
   # Before AI-GENIE
   temp <- colnames(embedding)
   colnames(embedding) <- items$ID
-  before_ega <- EGA.fit(data=embedding, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  before_ega <- EGA.fit(data=embedding, model = EGA.model, algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
   colnames(embedding) <- temp
 
   # Compute NMI before AI-GENIE
@@ -542,14 +542,14 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
   # Removes a count due to going back a previous step if entering the 'while' loop
 
   ### Sparse embedding
-  after_red_sparse <- EGA.fit(data=unique_items, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  after_red_sparse <- EGA.fit(data=unique_items, model = EGA.model,algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
   after_red_sparse_nmi <- igraph::compare(
     comm1=truth[colnames(unique_items)], comm2=after_red_sparse$wc, method = "nmi"
   )
 
   ### Full embedding
   unique_items_full <- embedding[, colnames(unique_items)]
-  after_red_full <- EGA.fit(data=unique_items_full, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  after_red_full <- EGA.fit(data=unique_items_full, model = EGA.model, algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
   after_red_full_nmi <- igraph::compare(
     comm1=truth[colnames(unique_items)], comm2=after_red_full$wc, method = "nmi"
   )
@@ -569,12 +569,12 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
 
   tryCatch(
     boot_res <- remove_instabilities(items=unique_items,
-                                     model = EGA.model, EGA.type = "EGA.fit", verbose = !silently, seed=123),
+                                     model = EGA.model, EGA.algorithm=EGA.algorithm, EGA.type = "EGA.fit", verbose = !silently, seed=123),
     error = function(e) {
       if(grepl("Error in dimnames(data) <- `*vtmp*` :", e$message)) {
         cat(" ...BootEGA failed. Trying new seed...")
         boot_res <- remove_instabilities(items=unique_items,
-                                         model = EGA.model, EGA.type = "EGA.fit", verbose = !silently,
+                                         model = EGA.model, EGA.algorithm=EGA.algorithm, EGA.type = "EGA.fit", verbose = !silently,
                                          seed=sample(1:1000, 1))
       } else {
         stop(e)
@@ -594,7 +594,7 @@ compute_EGA <- function(items, EGA.model, embedding, openai.key, silently, ...) 
   ## Final EGA
   temp <- colnames(item_set)
   colnames(item_set) <- items$ID[items$statement %in% temp]
-  final_ega <- EGA.fit(data=item_set, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+  final_ega <- EGA.fit(data=item_set, model = EGA.model, algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
   colnames(item_set) <- temp
 
   # Compute NMI after AI-GENIE
@@ -700,7 +700,7 @@ handle_error_logic <- function(error_count, unique_items_generated, error_type, 
 }
 
 compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_reduced, truth, truth_reduced,
-                                    EGA.model, title, calc.final.stability, silently){
+                                    EGA.model, EGA.algorithm, title, calc.final.stability, silently){
 
   # Assign unique IDs
   full_items <- data.frame("ID"= as.factor(1:nrow(items)),
@@ -729,7 +729,7 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
         colnames(embedding_use) <- items_reduced$ID
 
         # Run EGA and calculate NMI
-        final_ega <- EGA.fit(data = embedding_use, model = model_type, plot.EGA = FALSE, verbose = FALSE)$EGA
+        final_ega <- EGA.fit(data = embedding_use, model = model_type, algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
         colnames(embedding_use) <- temp  # Restore original column names
         final_nmi <- igraph::compare(comm1 = truth_reduced, comm2 = final_ega$wc, method = "nmi")
 
@@ -748,7 +748,7 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
       temp <- colnames(embedding_use)
       colnames(embedding_use) <- items_reduced$ID
 
-      final_ega <- EGA.fit(data = embedding_use, model = EGA.model, plot.EGA = FALSE, verbose = FALSE)$EGA
+      final_ega <- EGA.fit(data = embedding_use, model = EGA.model, algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
       colnames(embedding_use) <- temp
       final_nmi <- igraph::compare(comm1 = truth_reduced, comm2 = final_ega$wc, method = "nmi")
 
@@ -775,7 +775,7 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
   temp <- colnames(embedding_use)
   colnames(embedding_use) <- items$ID
 
-  best_before_ega <- EGA.fit(data = embedding_use, model = model_used, plot.EGA = FALSE, verbose = FALSE)$EGA
+  best_before_ega <- EGA.fit(data = embedding_use, model = model_used, algorithm=EGA.algorithm, plot.EGA = FALSE, verbose = FALSE)$EGA
   colnames(embedding_use) <- temp
   best_before_nmi <- igraph::compare(comm1 = truth, comm2 = best_before_ega$wc, method = "nmi")
 
@@ -787,14 +787,14 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
   if(calc.final.stability) {
     verbose <- !silently
     bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                                  seed = 1234, verbose = verbose, model = model_used)
+                                  seed = 1234, verbose = verbose, model = model_used, algorithm = EGA.algorithm)
 
     embedding_use <- if (embedding_type == "full") embedding_reduced else embedding_reduced_sparse
     temp <- colnames(embedding_use)
     colnames(embedding_use) <- items_reduced$ID
 
     bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE, seed = 1234,
-                                  verbose = verbose, model = model_used)
+                                  verbose = verbose, model = model_used, algorithm = EGA.algorithm)
     colnames(embedding_use) <- temp
 
     if(!silently) {
