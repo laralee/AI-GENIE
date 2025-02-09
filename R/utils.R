@@ -60,6 +60,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     "mixtral" = "mixtral-8x7b-32768",
     "gpt3.5" = "gpt-3.5-turbo",
     "gpt4o" = "gpt-4o",
+    "deepseek" = "deepseek-r1-distill-llama-70b",
     model # Default to the provided model name if not in the list
   )
 
@@ -792,6 +793,7 @@ generate_output <- function(openai.API, groq.API,
     "mixtral" = "mixtral-8x7b-32768",
     "gpt3.5" = "gpt-3.5-turbo",
     "gpt4o" = "gpt-4o",
+    "deepseek" = "deepseek-r1-distill-llama-70b",
     model # Default to the provided model name if not in the list
   )
 

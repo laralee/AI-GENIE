@@ -61,7 +61,7 @@ It must accept a single argument (the raw output text) and return a data frame w
 \item{sub.domain}{An optional character string specifying the inventory's sub-domain or specialty.}
 
 \item{model}{A character string specifying the language model to use. Options include \code{"gpt3.5"}, \code{"gpt4o"},
-\code{"llama3"}, \code{"mixtral"}, or \code{"gemma2"}. Defaults to \code{"gpt3.5"}.}
+\code{"llama3"}, \code{"mixtral"}, \code{"deepseek"}, or \code{"gemma2"}. Defaults to \code{"gpt3.5"}.}
 
 \item{item.examples}{An optional character vector of high-quality example item statements.}
 

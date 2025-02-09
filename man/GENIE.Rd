@@ -79,8 +79,9 @@ The number of items in the original item pool.
 \item{\code{final_N}}{
 The number of items in the final reduced item pool.
 }
-\item Optionally, if additional parameters were set (e.g., \code{keep.org = TRUE}), the output may also include:
-\code{original_items} (the original item pool) and/or extra embedding matrices.
+\item{\code{original_items}}{
+(Optional) If \code{keep.org = TRUE}, the output includes the original item pool and extra embedding matrices.
+}
 }
 }
 \description{
@@ -97,185 +98,68 @@ This function validates an existing item pool and performs redundancy reduction 
 ##### Use AI-GENIE without AI - Validate Existing Items via GENIE ######
 ########################################################################
 
-
 # Add an OpenAI API key
 key <- "INSERT YOUR KEY HERE"
 
 ## Create a data frame of items to reduce - for this example, we will focus only on Neuroticism and Extraversion
 
-## Neuroticism items
-# items with the 'anxious' attribute
+## Neuroticism items (example for the 'anxious' attribute)
 statements <- c("I often worry about things that may never happen.",
-"The thought of uncertainty makes me feel uneasy.",
-"I often feel on edge and apprehensive about the future.",
-"I tend to overthink and dwell on negative possibilities.",
-"I often find myself anticipating the worst possible outcome.",
-"I frequently feel a sense of dread without any specific reason.",
-"I often feel a sense of impending doom for no reason.",
-"I frequently have irrational fears that something bad will happen.",
-"I frequently worry about things that may never happen.",
-"I often feel a tightness in my chest when faced with uncertainty.",
-"I frequently worry about possible negative outcomes in everyday situations.",
-"I frequently feel a sense of impending doom for no reason.",
-"I frequently feel a knot in my stomach over minor uncertainties.",
-"I am constantly on edge, waiting for something terrible to happen.",
-"I constantly feel a sense of unease and worry, even in everyday situations.",
-"I often feel panicky and overwhelmed by minor stressors.")
+                "The thought of uncertainty makes me feel uneasy.",
+                "I often feel on edge and apprehensive about the future.",
+                "I tend to overthink and dwell on negative possibilities.",
+                "I often find myself anticipating the worst possible outcome.",
+                "I frequently feel a sense of dread without any specific reason.",
+                "I often feel a sense of impending doom for no reason.",
+                "I frequently have irrational fears that something bad will happen.",
+                "I frequently worry about things that may never happen.",
+                "I often feel a tightness in my chest when faced with uncertainty.",
+                "I frequently worry about possible negative outcomes in everyday situations.",
+                "I frequently feel a sense of impending doom for no reason.",
+                "I frequently feel a knot in my stomach over minor uncertainties.",
+                "I am constantly on edge, waiting for something terrible to happen.",
+                "I constantly feel a sense of unease and worry, even in everyday situations.",
+                "I often feel panicky and overwhelmed by minor stressors.")
 
-# add the appropriate type and attribute label
-type <- c(rep("neuroticism", 16))
-attribute <- c(rep("anxious", 16))
+type <- rep("neuroticism", 16)
+attribute <- rep("anxious", 16)
 
-# items with the 'depressed' attribute
-statements <- c(statements, "I frequently feel overwhelmed with sadness.",
-"Even small setbacks can greatly affect my mood.",
-"I frequently experience feelings of hopelessness and despair.",
-"I often struggle to find joy or pleasure in activities I used to enjoy.",
-"I often feel like there is a dark cloud hanging over me.",
-"I struggle to find a sense of purpose or meaning in my daily activities.",
-"I often struggle to see the point in going on each day.",
-"I find it hard to shake off feelings of sadness and despair.",
-"I often feel like everything is pointless and bleak.",
-"I frequently struggle to find motivation to get out of bed in the morning.",
-"I often feel overwhelmed with sadness.",
-"I often struggle to find motivation to engage in activities I used to enjoy.",
-"I frequently feel a heavy weight of sadness pressing down on me.",
-"I frequently experience a deep sense of sadness that lingers throughout the day.",
-"I often feel emotionally drained and devoid of energy for no apparent reason.")
+## Extraversion items (example for the 'assertive' attribute)
+extraversion_statements <- c("I am not afraid to speak my mind and assert my opinions in group discussions.",
+                             "I have no problem taking the lead in group projects or activities.",
+                             "I confidently express my thoughts and ideas in professional settings.",
+                             "I am not hesitant to take charge and make decisions when needed.",
+                             "I am not afraid to speak up and advocate for what I believe in.",
+                             "Others see me as someone who confidently asserts my opinions.",
+                             "I am not afraid to assert myself and speak up for what I believe in.",
+                             "Others see me as someone who confidently takes charge in group settings.",
+                             "I confidently voice my opinions and stand up for my beliefs.",
+                             "I am not afraid to take charge and lead when necessary.",
+                             "I confidently speak my mind and stand up for what I believe in.",
+                             "Taking the lead in group settings is something I excel at without hesitation.",
+                             "I confidently voice my opinions and assert myself in any situation.",
+                             "Others perceive me as someone who confidently takes charge and leads.",
+                             "I confidently express my opinions and assert myself when needed.",
+                             "Taking the lead in discussions or projects is something I do without hesitation.")
 
-# add the appropriate type and attribute label
-type <- c(type, rep("neuroticism", 15))
-attribute <- c(attribute, rep("depressed", 15))
-
-
-# Items with the 'emotional' attribute
-statements <- c(statements, "I am easily moved to tears by sentimental moments.",
-"I often find myself experiencing intense feelings of joy or sorrow.",
-"I am easily swept away by intense emotions.",
-"I find it challenging to control my emotional reactions.",
-"I have a tendency to be deeply affected by other peoples moods.",
-"I often find myself experiencing mood swings without a clear trigger.",
-"I am easily overwhelmed by my emotions, even in mundane situations.",
-"I often feel like my mood can shift drastically without warning.",
-"I often find myself tearing up over minor incidents.",
-"I frequently experience intense emotional reactions to everyday events.",
-"I frequently seek reassurance from others to feel confident.",
-"I find myself tearing up over seemingly insignificant moments.",
-"I often experience emotional highs and lows without clear reasons.",
-"I find myself easily moved to tears by emotional situations.",
-"I frequently feel overwhelmed by intense feelings that come out of nowhere.")
-
-# add the appropriate type and attribute label
-type <- c(type, rep("neuroticism", 15))
-attribute <- c(attribute, rep("emotional", 15))
-
-
-# add items with the 'insecure' attribute
-statements <- c(statements, "I often doubt my own abilities and decisions.",
-"I often seek reassurance from others to feel confident.",
-"I often feel inadequate compared to others.",
-"I am constantly worried about others opinions of me.",
-"I often feel like Im not good enough no matter how hard I try.",
-"I frequently worry about being rejected or abandoned by others.",
-"I frequently doubt my own self-worth and capabilities.",
-"I often feel like I dont measure up to others standards.",
-"I often compare myself unfavorably to others around me.",
-"I frequently doubt whether I am worthy of love and acceptance.",
-"I frequently doubt my own abilities and decisions.",
-"I often find it challenging to control my emotional reactions.",
-"I often doubt whether I am truly deserving of success and happiness.",
-"I frequently second-guess my social interactions, fearing I said something wrong.",
-"I frequently doubt my worth and significance in the eyes of others.",
-"I often feel like I dont belong or fit in with those around me.")
-
-# add the appropriate type and attribute label
-type <- c(type, rep("neuroticism", 16))
-attribute <- c(attribute, rep("insecure", 16))
-
-
-## Extraversion Items
-# Items with the 'assertive' attribute
-statements <- c(statements, "I am not afraid to speak my mind and assert my opinions in group discussions.",
-"I have no problem taking the lead in group projects or activities.",
-"I confidently express my thoughts and ideas in professional settings.",
-"I am not hesitant to take charge and make decisions when needed.",
-"I am not afraid to speak up and advocate for what I believe in.",
-"Others see me as someone who confidently asserts my opinions.",
-"I am not afraid to assert myself and speak up for what I believe in.",
-"Others see me as someone who confidently takes charge in group settings.",
-"I confidently voice my opinions and stand up for my beliefs.",
-"I am not afraid to take charge and lead when necessary.",
-"I confidently speak my mind and stand up for what I believe in.",
-"Taking the lead in group settings is something I excel at without hesitation.",
-"I confidently voice my opinions and assert myself in any situation.",
-"Others perceive me as someone who confidently takes charge and leads.",
-"I confidently express my opinions and assert myself when needed.",
-"Taking the lead in discussions or projects is something I do without hesitation.")
-
-# add the appropriate type and attribute label
 type <- c(type, rep("extraversion", 16))
 attribute <- c(attribute, rep("assertive", 16))
 
-# Items with the 'friendly' attribute
-statements <- c(statements, "I am someone who easily strikes up conversations with strangers in social settings.",
-"I tend to make friends wherever I go due to my sociable nature.",
-"I am known for my warm and welcoming demeanor towards others at social events.",
-"I never shy away from offering a helping hand or a listening ear to those in need.",
-"I am quick to offer a smile and strike up conversations with strangers.",
-"I am often described as someone who radiates warmth and friendliness.",
-"I am always eager to make new friends and build connections.",
-"Others often describe me as approachable and easy to talk to.",
-"I am always the first to greet new people and make them feel welcome.",
-"Others often describe me as kind-hearted and approachable.",
-"My warm and approachable nature instantly puts others at ease.",
-"I always go out of my way to make people feel welcome and comfortable.",
-"I never fail to greet strangers with a warm smile and welcoming demeanor.",
-"Making new friends comes naturally to me, thanks to my approachable nature.",
-"I am always known for my warm and welcoming demeanor towards others.",
-"I easily make friends wherever I go with my welcoming attitude.",
-"Others often describe me as radiating kindness and warmth.",
-"I am always known for my warm and welcoming demeanor towards others at social events.",
-"I tend to make friends effortlessly due to my warm demeanor.",
-"My approachable nature makes it easy for others to connect with me.")
+# Combine into a data frame
+my.personality.items <- data.frame(statement = c(statements, extraversion_statements),
+                                   type = type,
+                                   attribute = attribute,
+                                   stringsAsFactors = FALSE)
 
-# add the appropriate type and attribute label
-type <- c(type, rep("extraversion", 20))
-attribute <- c(attribute, rep("friendly", 20))
+# Run GENIE to validate and redundancy-check the item pool
+my.personality.inventory.results <- GENIE(
+  items = my.personality.items,
+  openai.API = key,
+  EGA.model = "tmfg",
+  EGA.algorithm = "walktrap"
+)
 
-
-# Add items with the 'energetic' attribute
-statements <- c( statements, "I always bring high levels of energy and enthusiasm to social gatherings.",
-"I thrive in dynamic and fast-paced environments due to my energized nature.",
-"I am always on the go, seeking new adventures and experiences.",
-"My boundless energy and enthusiasm are contagious to those around me.",
-"My high energy levels and enthusiasm are apparent in all that I do.",
-"I thrive in fast-paced environments due to my energized nature.",
-"My boundless energy and enthusiasm are evident in all aspects of my life.",
-"I thrive in fast-paced environments due to my high energy levels.",
-"I am always the life of the party, bringing high energy levels wherever I go.",
-"My boundless energy and enthusiasm are evident in every interaction.",
-"Thriving in fast-paced environments is second nature to me due to my high energy levels.",
-"My high energy levels are evident in all aspects of my life.",
-"I thrive in fast-paced environments due to my boundless enthusiasm.",
-"My high energy levels infuse enthusiasm into everything I do.",
-"I am always on the move, seeking new adventures and experiences.")
-
-# add the appropriate type and attribute label
-type <- c(type, rep("extraversion", 15))
-attribute <- c(attribute, rep("energetic", 15))
-
-
-# Build the data frame with three columns: statement, type, and attribute
-my.personality.items <- data.frame(statement = statements,
-                                    type = type,
-                                    attribute = attribute)
-
-# Run Genie to validate and redundancy-check an existing item pool
-my.personality.inventory.results <- GENIE(items = my.personality.items,
-                                         openai.API = key,
-                                         EGA.model = "tmfg")
-
-# View the final item pool
+# View the final refined item pool
 View(my.personality.inventory.results$main_result)
 }
 }

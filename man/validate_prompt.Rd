@@ -25,7 +25,8 @@ validate_prompt(
 
 \item{N.runs}{An integer specifying the number of times to run the prompt for preview; defaults to \code{3}.}
 
-\item{model}{A character string specifying the language model to use. Defaults to \code{"gpt3.5"}.}
+\item{model}{A character string specifying the language model to use. Options include \code{"gpt3.5"}, \code{"gpt4o"},
+\code{"llama3"}, \code{"mixtral"}, \code{"deepseek"}, or \code{"gemma2"}. Defaults to \code{"gpt3.5"}.}
 
 \item{top.p}{Numeric; defaults to \code{1}. Sets the top-p sampling parameter for the language model.}
 
@@ -50,7 +51,7 @@ and for the final generated items to meet your requirements before generating a 
   # Example: Preview the output from custom prompts before generating items
 
   # Replace with your actual OpenAI API key
-  key <- "YOUR_OPENAI_API_KEY"
+  key <- "INSERT YOUR KEY HERE"
 
   # Define custom prompts for two traits (e.g., "trait1" and "trait2")
   custom_prompts <- list(

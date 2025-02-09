@@ -106,6 +106,9 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   # Validate system.role
   system.role <- validate_system_role(system.role)
 
+  # Validate model
+  model <- validate_model(model)
+
   # Validate item.examples
   item.examples <- validate_item_examples(item.examples, model)
 
@@ -116,9 +119,6 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   api_keys <- validate_api_keys(openai.API, groq.API, model)
   openai.API <- api_keys$openai.API
   groq.API <- api_keys$groq.API
-
-  # Validate model
-  model <- validate_model(model)
 
   # Validate temperature and top.p
   params <- validate_temperature_top.p(temperature, top.p)
