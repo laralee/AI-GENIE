@@ -10,7 +10,7 @@ validate_EGA_model(EGA.model)
 \item{EGA.model}{A character string specifying the model to be used with EGA, one of \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.}
 }
 \value{
-No return value; the function stops with an error message if validation fails.
+EGA.model string in lowercase; the function stops with an error message if validation fails.
 }
 \description{
 Validates the \code{EGA.model} parameter to ensure it is either \code{"tmfg"}, \code{"glasso"}, or \code{NULL}.

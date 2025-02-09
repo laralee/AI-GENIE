@@ -23,6 +23,7 @@ AIGENIE(
   items.only = FALSE,
   adaptive = TRUE,
   EGA.model = NULL,
+  embedding.model = "text-embedding-3-small",
   keep.org = FALSE,
   plot = TRUE,
   plot.stability = FALSE,
@@ -68,6 +69,8 @@ AIGENIE(
 
 \item{EGA.model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
 
+\item{embedding.model}{A character string specifying the OpenAI embedding model that should be used. The options are \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}. Defaults to \code{"text-embedding-3-small"}.}
+
 \item{keep.org}{Logical; defaults to \code{FALSE}. When \code{TRUE}, returns a data frame of the original item pool.}
 
 \item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display the main summary network plots.}
@@ -88,7 +91,7 @@ A list containing:
 \item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
 \item{\code{embeddings}}{The embeddings generated for the items.}
 \item{\code{sparse_embeddings}}{The sparsified embeddings generated for the items}
-\item{\code {embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
+\item{\code{embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
 \item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
 \item{\code{selected_model}}{The EGA model used throughout the pipeline.}
 \item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
@@ -174,11 +177,11 @@ custom.personality.prompts <- list(
   neuroticism = paste0(
     "Generate NINE unique, psychometrically robust single-statement items designed to assess ",
     "the Big Five personality trait neuroticism. Put EACH item on its own line. ",
-    "Neuroticism has the following characteristics: perfectionism, temperamental, and overthinking.",
-    "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important.",
+    "Neuroticism has the following characteristics: anxious, depressed, insecure, and emotional. ",
+    "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important. ",
     "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
-  ),
+ ),
 
   # Prompt for generating openness traits
   openness = paste0(
@@ -192,12 +195,12 @@ custom.personality.prompts <- list(
 
   # Prompt for generating extraversion traits
   extraversion = paste0(
-    "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
-    "the Big Five personality trait extraversion. Put EACH item on its own line. ",
-    "Extraversion has the following characteristics: gregarious and talkative.",
-    "Generate EXACTLY FOUR items that target EACH characteristic. This is VERY important.",
-    "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
-    "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
+  "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
+  "the Big Five personality trait extraversion. Put EACH item on its own line. ",
+  "Extraversion has the following characteristics: friendly, positive, assertive, and energetic. ",
+  "Generate EXACTLY FOUR items that target EACH characteristic. This is VERY important. ",
+  "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+  "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
   )
 
 )

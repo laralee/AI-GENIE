@@ -23,6 +23,7 @@ AIGENIE_checks(
   items.only,
   adaptive,
   EGA.model,
+  embedding.model,
   keep.org,
   plot,
   plot.stability,
@@ -67,6 +68,8 @@ AIGENIE_checks(
 \item{adaptive}{Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items.}
 
 \item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
+
+\item{embedding.model}{A character string specifying the OpenAI embedding model that should be used. The options are \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}. Defaults to \code{"text-embedding-3-small"}.}
 
 \item{keep.org}{Logical; if \code{TRUE}, includes the original items in the returned results.}
 

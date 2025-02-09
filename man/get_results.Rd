@@ -4,7 +4,16 @@
 \alias{get_results}
 \title{Get Results}
 \usage{
-get_results(items, EGA.model, openai.key, item_type, keep.org, silently, ...)
+get_results(
+  items,
+  EGA.model,
+  embedding.model,
+  openai.key,
+  item_type,
+  keep.org,
+  silently,
+  ...
+)
 }
 \arguments{
 \item{items}{A data frame containing the item statements and types.}

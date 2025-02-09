@@ -122,11 +122,11 @@
 #'   neuroticism = paste0(
 #'     "Generate NINE unique, psychometrically robust single-statement items designed to assess ",
 #'     "the Big Five personality trait neuroticism. Put EACH item on its own line. ",
-#'     "Neuroticism has the following characteristics: perfectionism, temperamental, and overthinking.",
-#'     "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important.",
+#'     "Neuroticism has the following characteristics: anxious, depressed, insecure, and emotional. ",
+#'     "Generate EXACTLY THREE items that target EACH characteristic. This is VERY important. ",
 #'     "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
 #'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
-#'   ),
+#'  ),
 #'
 #'   # Prompt for generating openness traits
 #'   openness = paste0(
@@ -140,12 +140,12 @@
 #'
 #'   # Prompt for generating extraversion traits
 #'   extraversion = paste0(
-#'     "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
-#'     "the Big Five personality trait extraversion. Put EACH item on its own line. ",
-#'     "Extraversion has the following characteristics: gregarious and talkative.",
-#'     "Generate EXACTLY FOUR items that target EACH characteristic. This is VERY important.",
-#'     "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
-#'     "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
+#'   "Generate EIGHT unique, psychometrically robust single-statement items designed to assess ",
+#'   "the Big Five personality trait extraversion. Put EACH item on its own line. ",
+#'   "Extraversion has the following characteristics: friendly, positive, assertive, and energetic. ",
+#'   "Generate EXACTLY FOUR items that target EACH characteristic. This is VERY important. ",
+#'   "Format the items EXACTLY like so: \n<characteristic>||<item statement>\n",
+#'   "The formatting is EXTREMELY important, so follow it EXACTLY. Be creative! Avoid repetition."
 #'   )
 #'
 #' )

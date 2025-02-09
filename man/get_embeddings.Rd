@@ -4,7 +4,7 @@
 \alias{get_embeddings}
 \title{Generates embeddings for the provided item statements using OpenAI's embedding model.}
 \usage{
-get_embeddings(items, dimensions = NULL, openai.key, ...)
+get_embeddings(items, embedding.model, dimensions = NULL, openai.key, ...)
 }
 \arguments{
 \item{items}{A data frame containing the item statements. Must have a column named \code{statement}.}

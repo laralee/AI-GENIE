@@ -68,7 +68,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
   if (!custom) {
     split_content <- tm::stemDocument(unlist(item.attributes))
     split_content <- tolower(gsub("[[:punct:]]", "", split_content))
-
     # Duplicate attribute check is already handled in validate_item_attributes
   }
 
@@ -141,7 +140,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
               stop()
             }
 
-            #API Call with Timeout
+            # API Call with Timeout
             R.utils::withTimeout({
               response <- generate_FUN(
                 model = model,
@@ -151,6 +150,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
                 top_p = top.p
               )
             }, timeout = 20, onTimeout = "error")
+            response
           },
           error = function(e) {
             max_consecutive_errors <- 10
@@ -184,7 +184,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             # Return a 'try-error' class to continue the loop
             structure(list(), class = "try-error")
           }
-
         )
 
         # Reset error_count after successful API call
@@ -199,22 +198,76 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
         # Use the clean_items function to process and clean the AI-generated items
         current_items_df <- clean_items(response, split_content, data.frame(), current_label)
       } else {
-        tryCatch({
-          output <- cleaner_fun(response$choices[[1]]$message$content)
-        }, error = function(e) {
-          if(grepl("unused argument", e$message)) {
-            stop("Your text cleaning function should accept exactly one parameter.")
+        # Custom cleaning branch with retry mechanism
+        max_cleaning_attempts <- 5
+        cleaning_attempt <- 1
+        cleaning_success <- FALSE
+
+        while (cleaning_attempt <= max_cleaning_attempts && !cleaning_success) {
+
+          # If this is a retry, re-run the API call for a fresh response
+          if (cleaning_attempt > 1) {
+            Sys.sleep(runif(1, min = 1, max = 3))
+            response <- tryCatch({
+              if (adaptive && length(unique_items) > 0) {
+                sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
+                previous_items_text <- paste0(sampled_items, collapse = "\n")
+                constructed_content <- paste0(
+                  user.prompts[[i]],
+                  "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",
+                  previous_items_text,
+                  "\n"
+                )
+              } else {
+                constructed_content <- user.prompts[[i]]
+              }
+              messages_list <- list(
+                list("role" = "system", "content" = system.role),
+                list("role" = "user", "content" = constructed_content)
+              )
+              R.utils::withTimeout({
+                response <- generate_FUN(
+                  model = model,
+                  messages = messages_list,
+                  temperature = temperature,
+                  max_tokens = max_tokens_set,
+                  top_p = top.p
+                )
+              }, timeout = 20, onTimeout = "error")
+              response
+            }, error = function(e) {
+              structure(list(), class = "try-error")
+            })
+          }
+
+          cleaning_result <- tryCatch({
+            output <- cleaner_fun(response$choices[[1]]$message$content)
+            validate_output <- validate_return_object(output, n_empty, item.attributes)
+            list(success = TRUE, validate_output = validate_output)
+          }, error = function(e) {
+            list(success = FALSE, error = e)
+          })
+
+          if (cleaning_result$success) {
+            cleaning_success <- TRUE
+            validate_output <- cleaning_result$validate_output
+            cleaned_items <- validate_output[["items"]]
+            n_empty <- validate_output[["n_empty"]]
+            cleaned_item_attributes <- validate_output[["item_attributes"]]
           } else {
-            stop(e)
-          }}
-        )
-        validate_output <- validate_return_object(output, n_empty, item.attributes)
-        cleaned_items <- validate_output[["items"]]
-        n_empty <- validate_output[["n_empty"]]
-        cleaned_item_attributes <- validate_output[["item_attributes"]]
-        current_items_df <- data.frame(type=rep(current_label, length(cleaned_items)),
-                                       attribute= cleaned_item_attributes,
-                                       statement=cleaned_items)
+            cleaning_attempt <- cleaning_attempt + 1
+            if (cleaning_attempt > max_cleaning_attempts) {
+              stop(cleaning_result$error)
+            } else {
+              warning(sprintf("Custom cleaning function failed on attempt %d of %d: %s. Retrying API call...",
+                              cleaning_attempt - 1, max_cleaning_attempts, cleaning_result$error$message))
+            }
+          }
+        }
+
+        current_items_df <- data.frame(type = rep(current_label, length(cleaned_items)),
+                                       attribute = cleaned_item_attributes,
+                                       statement = cleaned_items)
       }
 
       # Ensure all whitespace is trimmed
@@ -279,19 +332,19 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
   items_df$statement <- trimws(gsub('[\"\\\']', "", items_df$statement))
   rownames(items_df) <- NULL
 
-
-
   items_df_nd <- items_df[!duplicated(items_df$statement),]
 
   if (nrow(items_df) != nrow(items_df_nd)){
     if (!silently){
       cat("\n")
       cat(paste(nrow(items_df) - nrow(items_df_nd), "duplicate item(s) detected and removed."))
-      cat("\n")}
+      cat("\n")
+    }
   }
 
   if(!silently){
-    cat(paste0("All items generated. Final sample size: ", nrow(items_df_nd)))}
+    cat(paste0("All items generated. Final sample size: ", nrow(items_df_nd)))
+  }
   return(items_df_nd)
 }
 
