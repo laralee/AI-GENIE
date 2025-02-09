@@ -630,9 +630,10 @@ plot_networks <- function(p1, p2, caption1, caption2, nmi2, nmi1, scale.title, i
 
 
 
-generate.output <- function(openai.API, groq.API,
+generate_output <- function(openai.API, groq.API,
                             user.prompts, N.runs, model,
-                            top.p, temperature) {
+                            top.p, temperature, system.role,
+                            silently) {
 
   # Switch model name to the correct name in the API
   model <- switch(
@@ -659,6 +660,10 @@ generate.output <- function(openai.API, groq.API,
     max_tokens_set <- 7000L
   }
 
+  if(is.null(system.role)){
+    system.role <- "You are an expert psychometrician and test developer. Your task is to create high-quality, psychometrically robust items."
+  }
+
   item.types <- names(user.prompts)
 
 
@@ -673,9 +678,12 @@ generate.output <- function(openai.API, groq.API,
       cat(paste("Generating responses for", current_label, "... "))
     }
 
+    messages_list <- list(
+      list("role" = "system", "content" = system.role),
+      list("role" = "user", "content" = user.prompts[[current_label]])
+    )
 
     for (i in 1:N.runs) {
-
     #API Call with Timeout
     R.utils::withTimeout({
       response <- generate_FUN( model = model,
@@ -688,7 +696,9 @@ generate.output <- function(openai.API, groq.API,
 
       responses[[current_label]][[i]] <- response$choices[[1]]$message$content
     }
-    cat("Done.\n")
+
+    if(!silently){
+    cat("Done.\n")}
 
   }
 
