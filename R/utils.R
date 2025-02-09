@@ -668,7 +668,9 @@ run_pipeline <- function(items, openai.key,
     plot(complied_results$stability_plot)
   }
 
+  if(!silently){
   print_results(overall_result)
+  }
 
   # add the appropriate embedding vectors to the item-level results
   for (item.type in names(item_level_results)){

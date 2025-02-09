@@ -107,7 +107,7 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   system.role <- validate_system_role(system.role)
 
   # Validate model
-  model <- validate_model(model)
+  model <- validate_model(model, silently)
 
   # Validate item.examples
   item.examples <- validate_item_examples(item.examples, model)
@@ -302,12 +302,12 @@ validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, mo
   }
 
   # Validate the boolean
-  if(!is.logical(silently)){
+  if(!(silently == TRUE | silently == FALSE)){
     stop("Silently must either be set to TRUE or FALSE.")
   }
 
   # Validate the model
-  model <- validate_model(model)
+  model <- validate_model(model, silently)
 
   # Validate system.role
   system.role <- validate_system_role(system.role)

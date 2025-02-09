@@ -346,13 +346,15 @@ validate_api_keys <- function(openai.API, groq.API, model) {
 #'
 #' @param model A character string specifying the model to be used (e.g., "gpt3.5", "gpt4o", "llama3").
 #' @return The normalized model name as a string.
-validate_model <- function(model) {
+validate_model <- function(model, silently) {
   supported_models <- c("gpt3.5", "gpt4o", "llama3", "mixtral", "gemma2", "deepseek")
   if(is.character(model)){
     model <- tolower(model)
     model <- gsub("\\s+", "", model)
-  if (!(model %in% supported_models)) {
-    stop(paste("Unsupported model. Choose from:", paste(supported_models, collapse = ", ")))
+  if (!(model %in% supported_models) && !silently) {
+    cat(paste("Your 'model' argument is not recognized. \nEnsure you are using an appropriate model string recognized by the API. \nOtherwise, choose from:", paste(supported_models, collapse = ", ")))
+    cat("\n")
+    cat("\n")
   }} else {
     stop("Model must be a character string.")
   }
