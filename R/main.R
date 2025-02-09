@@ -560,3 +560,27 @@ GENIE <- function(items, openai.API, EGA.model=NULL, plot=TRUE, plot.stability =
   return(run_pipeline)
 
 }
+
+
+validate_prompt <- function(openai.API=NULL, groq.API = NULL,
+                            user.prompts = NULL, N.runs = 3,
+                            model="gpt3.5", top.p=1, temperature=1){
+
+  validate_promt_inputs <- validate_promt_inputs(openai.API, groq.API,
+                                                 user.prompts, N.runs, model,
+                                                 top.p, temperature)
+
+  user.prompts <- validate_promt_inputs$user.prompts
+  openai.API <- validate_promt_inputs$openai.API
+  groq.API <- validate_promt_inputs$groq.API
+  model <- validate_promt_inputs$model
+
+  return(generate.output(openai.API, groq.API,
+                  user.prompts, N.runs, model,
+                  top.p, temperature))
+}
+
+
+
+
+

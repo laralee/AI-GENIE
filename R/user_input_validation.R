@@ -275,3 +275,40 @@ validate_return_object <- function(output, n_empty, item_attributes) {
 }
 
 
+
+validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, model,
+                                  top.p, temperature) {
+  # check that there are no NAs
+  check_no_na(openai.API, groq.API, user.prompts, N.runs, model)
+
+  # check that there is exactly ONE API
+  if(is.null(groq.API) && is.null(openai.API)){
+    stop("Please provide at least one API.")
+  }
+
+  # Validate the model
+  model <- validate_model(model)
+
+  # Validate the APIs
+  apis <- validate_apis(openai.API, groq.API, model)
+  groq.API <- apis$groq.API
+  openai.API <- apis$openai.API
+
+  # Validate user prompts
+  user.prompts <- validate_user_prompts(user.prompts)
+
+  # Validate integers
+  if(!is.integer(N.runs)){
+    stop("N.runs must be an integer.")
+  }
+  if(!is.integer(top.p)){
+    stop("Top.p must be an integer.")
+  }
+
+  # Validate temperature
+  if(!is.numeric(temperature)){
+    stop("Temperature must be a number.")
+  }
+
+  return(list(openai.API=openai.API, groq.API=groq.API, user.prompts=user.prompts, model=model))
+}

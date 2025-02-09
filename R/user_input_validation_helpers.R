@@ -348,8 +348,13 @@ validate_api_keys <- function(openai.API, groq.API, model) {
 #' @return The normalized model name as a string.
 validate_model <- function(model) {
   supported_models <- c("gpt3.5", "gpt4o", "llama3", "mixtral", "gemma2")
+  if(is.character(model)){
+    model <- tolower(model)
+    model <- gsub("\\s+", "", model)
   if (!(model %in% supported_models)) {
     stop(paste("Unsupported model. Choose from:", paste(supported_models, collapse = ", ")))
+  }} else {
+    stop("Model must be a character string.")
   }
   return(model)
 }
@@ -927,4 +932,37 @@ validate_and_extract_attributes <- function(df) {
 
   # Return the list
   return(type_attribute_list)
+}
+
+
+validate_apis <- function(openai.API, groq.API, model){
+  if(is.null(openai.API) && is.null(groq.API)){
+    stop("Please provide at least one API.")
+  }
+
+  if(is.null(openai.API) && (model=="gpt4o" | model=="gpt3.5")){
+    stop("You need to provide an openAI API key to use the GPT models.")
+  }
+
+  if(is.null(groq.API) && (model=="gemma2" | model=="mixtral" | model=="llama3")){
+    stop("You need to provide an Groq API key to use the Gemma, Mixtral, or Llama models.")
+  }
+
+  if(!is.null(groq.API)){
+    if(!is.character(groq.API)){
+      stop("Your Groq API key must be a valid string.")
+    }
+
+    groq.API <- trim.default(groq.API)
+  }
+
+  if(!is.null(openai.API)){
+    if(!is.character(openai.API)){
+      stop("Your OpenAI API key must be a valid string.")
+    }
+
+    openai.API <- trim.default(openai.API)
+  }
+
+  return(list(openai.API = openai.API, groq.API = groq.API))
 }

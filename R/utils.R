@@ -630,4 +630,68 @@ plot_networks <- function(p1, p2, caption1, caption2, nmi2, nmi1, scale.title, i
 
 
 
+generate.output <- function(openai.API, groq.API,
+                            user.prompts, N.runs, model,
+                            top.p, temperature) {
 
+  # Switch model name to the correct name in the API
+  model <- switch(
+    model,
+    "llama3" = "llama3-8b-8192",
+    "gemma2" = "gemma2-9b-it",
+    "mixtral" = "mixtral-8x7b-32768",
+    "gpt3.5" = "gpt-3.5-turbo",
+    "gpt4o" = "gpt-4o",
+    model # Default to the provided model name if not in the list
+  )
+
+
+  # Determine which model to use
+  if (grepl("gpt", model)) {
+    openai <- reticulate::import("openai")
+    openai$api_key <- openai.API
+    generate_FUN <- openai$ChatCompletion$create
+    max_tokens_set <- 4096L
+  } else {
+    groq <- reticulate::import("groq")
+    groq_client <- groq$Groq(api_key = groq.API)
+    generate_FUN <- groq_client$chat$completions$create
+    max_tokens_set <- 7000L
+  }
+
+  item.types <- names(user.prompts)
+
+
+  responses <- list()
+
+  for (i in seq_along(item.types)) {
+
+    current_label <- item.types[[i]]
+
+    # Print "Generating items for..." message
+    if(!silently){
+      cat(paste("Generating responses for", current_label, "... "))
+    }
+
+
+    for (i in 1:N.runs) {
+
+    #API Call with Timeout
+    R.utils::withTimeout({
+      response <- generate_FUN( model = model,
+                messages = messages_list,
+                temperature = temperature,
+                max_tokens = max_tokens_set,
+                top_p = top.p
+              )
+            }, timeout = 20, onTimeout = "error")
+
+      responses[[current_label]][[i]] <- response$choices[[1]]$message$content
+    }
+    cat("Done.\n")
+
+  }
+
+  return(responses)
+
+}
