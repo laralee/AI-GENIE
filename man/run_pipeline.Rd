@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{run_pipeline}
 \alias{run_pipeline}
-\title{Run AI-GENIE Pipeline}
+\title{Run the AI-GENIE Reduction and Analysis Pipeline}
 \usage{
 run_pipeline(
   items,
@@ -20,46 +20,107 @@ run_pipeline(
 )
 }
 \arguments{
-\item{items}{A data frame containing the item statements and types.}
+\item{items}{A data frame of items with at least three columns: \code{statement} (item text), \code{type} (item type), and \code{attribute} (item attribute).
+This data frame represents the complete item pool.}
 
-\item{openai.key}{A character string of your OpenAI API key.}
+\item{openai.key}{A character string containing your OpenAI API key.}
 
-\item{title}{An optional character string specifying the title for the network plots. Defaults to \code{"Networks Before and After AI-Genie"}.}
+\item{title}{A character string for the analysis title, used in plot captions (default: "Networks Before and After AI-Genie").}
 
-\item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
+\item{EGA.model}{An optional character string specifying the EGA model to use (e.g., \code{"tmfg"} or \code{"glasso"}). If \code{NULL},
+both models are evaluated, and the one with the highest NMI is selected.}
 
-\item{keep.org}{Logical; if \code{TRUE}, includes the original items in the returned results. Defaults to \code{FALSE}.}
+\item{EGA.algorithm}{A character string specifying the clustering algorithm for EGA (e.g., \code{"walktrap"}, \code{"louvain"}, or \code{"leiden"}).}
 
-\item{plot}{Logical; if \code{TRUE}, displays the network plots. Defaults to \code{TRUE}.}
+\item{embedding.model}{A character string specifying the OpenAI embedding model to use.}
 
-\item{plot.stability}{Logical; Specifies whether to display the secondary network stability plots. Defaults to \code{FALSE}.}
+\item{keep.org}{Logical; if \code{TRUE}, the original item pool and original embedding matrices are included in the output.}
 
-\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction.}
+\item{plot}{Logical; if \code{TRUE}, network plots comparing the pre- and post-reduction item networks are generated.}
 
-\item{silently}{Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.}
+\item{plot.stability}{Logical; if \code{TRUE}, additional stability plots (from bootEGA) are generated.}
+
+\item{calc.final.stability}{Logical; if \code{TRUE}, final bootstrapped stability analysis is performed.}
+
+\item{silently}{Logical; if \code{TRUE}, suppresses console output.}
 
 \item{...}{Additional arguments passed to underlying functions.}
 }
 \value{
-A list containing:
+A list with two components:
 \describe{
-\item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.}
-\item{\code{final_ega_obj}}{The final EGA object after reduction.}
-\item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
-\item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
-\item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
-\item{\code{embeddings}}{The embeddings generated for the items.}
-\item{\code{sparse_embeddings}}{The sparsifies embeddings generated for the items}
-\item{\code{embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
-\item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
-\item{\code{selected_model}}{The EGA model used throughout the pipeline.}
-\item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
-\item{\code{start_nmi}}{The NMI of the original item pool.}
-\item{\code{start_N}}{The starting sample size (number of items).}
-\item{\code{final_N}}{The final sample size after reduction.}
-\item{\code{original_items (optional)}}{(ONLY returns if \code{keep.org} is \code{TRUE}) The original sample generated.}
+\item{\code{overall_sample}}{
+A list containing overall sample-level analysis results, including:
+\itemize{
+\item \code{main_result}: A data frame of the refined (reduced) item pool for the entire sample.
+\item \code{final_ega_obj}: The final EGA object after reduction.
+\item \code{final_bootega_obj}: The final bootEGA object (if stability analysis was performed).
+\item \code{initial_ega_obj}: The initial EGA object computed on the full item pool.
+\item \code{initial_bootega_obj}: The initial bootEGA object computed on the redundancy-reduced items.
+\item \code{selected_model}: The EGA model used (either as specified or chosen based on optimal NMI).
+\item \code{nmi}: The final Normalized Mutual Information (NMI) value after reduction.
+\item \code{start_nmi}: The NMI computed on the original item pool.
+\item \code{start_N}: The total number of items in the original pool.
+\item \code{final_N}: The number of items in the final reduced pool.
+\item \code{network_plot}: A network plot object comparing pre- and post-reduction item networks.
+\item \code{stability_plot}: A stability plot object (if \code{calc.final.stability = TRUE}).
+\item \code{embeddings}: A list containing embedding matrices used in the analysis:
+\itemize{
+\item \code{full}: The full embeddings matrix for the reduced items.
+\item \code{sparse}: A sparsified version of the embeddings.
+\item \code{embed_type_used}: A string indicating whether "full" or "sparse" embeddings were used.
+}
+\item Optionally, if \code{keep.org = TRUE}, additional elements are included:
+\itemize{
+\item \code{original_sample_items}: The original item pool as a data frame.
+\item \code{original_sample_full}: The full embeddings matrix for the original items.
+\item \code{original_sample_sparse}: A sparsified version of the original embeddings.
+}
+}
+}
+\item{\code{item_type_level}}{
+A named list with detailed analysis results for each individual item type. Each element is a list
+(structured similarly to the overall sample result) representing the analysis performed solely on the items
+of that type.
+}
 }
 }
 \description{
-Executes the AI-GENIE reduction analysis pipeline on the provided items, including embeddings generation, redundancy removal, instability removal, and network plotting.
+This function implements the core reduction and analysis pipeline for an item pool. It takes a data frame of items
+(with at least three columns: \code{statement}, \code{type}, and \code{attribute}) and performs the following steps:
+}
+\details{
+\enumerate{
+\item \strong{Item-Type Level Analysis:}
+\itemize{
+\item Splits the item pool into subsets based on the \code{type} column.
+\item For each item type, calls \code{get_results} to obtain reduction results that include:
+\describe{
+\item{Embeddings}{A matrix of embeddings for the items of that type.}
+\item{EGA Objects}{Both initial and final Exploratory Graph Analysis (EGA) objects.}
+\item{BootEGA Objects}{Bootstrapped EGA objects for assessing item stability (if calculated).}
+\item{Network/Stability Plots}{Plots comparing the item network and stability before and after reduction.}
+}
+\item Collects the embeddings, reduced items, and truth labels (from the \code{attribute} column) from each subset.
+}
+
+\item \strong{Overall Sample Analysis:}
+\itemize{
+\item Aggregates the embeddings and reduced items across all item types.
+\item Calls \code{compute_ega_full_sample} to optimize the overall EGA network by evaluating different embedding configurations (full vs. sparse)
+and selecting the model (or combination) that maximizes the Normalized Mutual Information (NMI).
+\item Computes overall quality metrics (such as \code{nmi}, \code{start_nmi}, \code{start_N}, and \code{final_N}) and generates
+overall network and (optionally) stability plots.
+}
+
+\item \strong{Embedding Augmentation:}
+\itemize{
+\item Optionally (if \code{keep.org = TRUE}), retains the original item pool and associated embeddings.
+\item For each item type, appends the corresponding embedding matrices (both full and sparsified) along with an indicator
+of which type was ultimately used.
+}
+}
+
+Additionally, if \code{plot} and/or \code{plot.stability} are \code{TRUE}, the function displays the network and stability plots,
+and it prints a summary of the overall results via \code{print_results}.
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{plot_networks}
 \alias{plot_networks}
-\title{Plot Networks Before and After AI-GENIE Reduction}
+\title{Plot Network Comparisons}
 \usage{
 plot_networks(
   p1,
@@ -16,21 +16,30 @@ plot_networks(
 )
 }
 \arguments{
-\item{p1}{An EGA object representing the initial network structure (or stability).}
+\item{p1}{An object representing the first network analysis result (e.g., the initial EGA object before reduction).}
 
-\item{p2}{An EGA object representing the final network structure after AI-GENIE reduction (or stability).}
+\item{p2}{An object representing the second network analysis result (e.g., the final EGA object after reduction).}
 
-\item{nmi2}{Numeric; the Normalized Mutual Information (NMI) of the final item pool.}
+\item{caption1}{A character string to be used as a caption or title for the first network (e.g., "Before AI-GENIE Network").}
 
-\item{nmi1}{Numeric; the NMI of the original item pool (or the item pool that was redundancy reduced, in the case of item stability).}
+\item{caption2}{A character string for the second network (e.g., "After AI-GENIE Network").}
 
-\item{scale.title}{A character string specifying the title for the combined plot.}
+\item{nmi2}{A numeric value representing the NMI of the second network.}
 
-\item{ident}{Logical; specifies if the two bootEGA objects are the same (i.e., if there was only one round of bootEGA). Defaults to \code{FALSE}}
+\item{nmi1}{A numeric value representing the Normalized Mutual Information (NMI) of the first network.}
+
+\item{scale.title}{A character string specifying the title of the scale or inventory; it is used to annotate the plot.}
+
+\item{ident}{Logical; if \code{TRUE}, the function adjusts the plot layout or labeling based on item identity details.}
 }
 \value{
-A combined plot object displaying the initial and final networks with captions and annotations.
+A plot object that visually compares the two network structures. The plot will typically display
+the two networks (either side-by-side or in an overlaid manner) with the provided captions and NMI values.
+The exact type of the plot object (e.g., a \code{ggplot} object or a base R plot) depends on the implementation.
 }
 \description{
-Creates a combined plot of the initial and final network structures before and after AI-GENIE reduction, including NMI values and a change subtitle.
+Generates a comparative plot of two network analysis results, typically representing the item network
+before and after AI-GENIE reduction. The plot includes provided captions, displays NMI values for each network,
+and incorporates a scale title to contextualize the comparison. The layout may be adjusted based on the
+\code{ident} parameter.
 }

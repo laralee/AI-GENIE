@@ -26,45 +26,72 @@ generate.items.internal(
 )
 }
 \arguments{
-\item{model}{A character string specifying the model to use for item generation. Options include \code{"gpt3.5"}, \code{"gpt4o"}, \code{"llama3"}, \code{"mixtral"}, or \code{"gemma2"}. The function internally maps these to the correct API model names.}
+\item{model}{A character string specifying the language model to use. Internally, certain model names are mapped
+to API-specific identifiers (e.g., "gpt3.5" becomes "gpt-3.5-turbo").}
 
-\item{temperature}{Numeric; controls the randomness of the model's output. A value between \code{0} and \code{2}, where higher values produce more random results. Defaults to \code{1}.}
+\item{temperature}{Numeric; controls the randomness of the model's output (range: 0–2).}
 
-\item{top.p}{Numeric; controls the diversity of the model's output by sampling from the top \code{p} probability mass. A value between \code{0} and \code{1}. Defaults to \code{1}.}
+\item{top.p}{Numeric; sets the top-p sampling parameter (range: 0–1).}
 
-\item{groq.API}{A character string of your Groq API key. Required if using open-source models.}
+\item{groq.API}{A character string containing the Groq API key (used when a non-GPT model is selected).}
 
-\item{openai.API}{A character string of your OpenAI API key. Required if using GPT models.}
+\item{openai.API}{A character string containing the OpenAI API key.}
 
-\item{target.N}{An integer vector specifying the target number of items to generate for each item type.}
+\item{target.N}{An integer or vector of integers specifying the target number of items to generate for each item type.}
 
-\item{item.attributes}{A named list or data frame where each element is a character vector of attributes corresponding to each item type. Required when \code{custom = FALSE}.}
+\item{item.attributes}{A named list where each element is a character vector of attributes for an item type.
+The names of the list elements serve as the item type labels.}
 
-\item{scale.title}{An optional character string specifying the name of your inventory.}
+\item{scale.title}{An optional character string specifying the title of the inventory.}
 
 \item{sub.domain}{An optional character string specifying the inventory's sub-domain or specialty.}
 
-\item{item.examples}{An optional character vector of well-crafted, high-quality example item strings.}
+\item{item.examples}{An optional character vector of example item statements to guide generation.}
 
-\item{system.role}{A character string describing the language model's role.}
+\item{system.role}{An optional character string describing the role the language model should assume
+(e.g., "an expert psychometrician and test developer"). If \code{NULL}, a default is generated.}
 
-\item{user.prompts}{A named list of custom prompts written by the user to be in the model}
+\item{user.prompts}{(Required when \code{custom = TRUE}) A named list of custom prompt strings for each item type.}
 
-\item{item.type.definitions}{An optional named list or data frame providing definitions for each item type. Each definition should be a character string not exceeding 250 characters. This helps the language model understand the item types better. Definitions are included at the beginning of the prompts for their corresponding item types.}
+\item{item.type.definitions}{An optional named list or data frame providing brief definitions (up to 250 characters)
+for each item type. In default mode, these definitions are prepended to the generated prompts.}
 
-\item{cleaner_fun}{A function provided by the user to clean and parse the model's output when \code{custom = TRUE}. The function must accept exactly one parameter (the model's output) and return a list of cleaned items.}
+\item{cleaner_fun}{(Required when \code{custom = TRUE}) A user-supplied function to clean and parse the language model's output.
+The function must accept a single parameter (the raw output text) and return a data frame with two columns:
+\code{item} and \code{attribute}.}
 
-\item{custom}{Logical; indicates whether custom prompts and a custom cleaning function are used. Defaults to \code{FALSE}.}
+\item{custom}{Logical; if \code{TRUE}, user-supplied prompts and cleaning function are used. Defaults to \code{FALSE}.}
 
-\item{adaptive}{Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items by including previously generated items in the prompt. Defaults to \code{TRUE}.}
+\item{adaptive}{Logical; if \code{TRUE}, previously generated items are incorporated into subsequent API calls to reduce redundancy.}
 
-\item{silently}{Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.}
+\item{silently}{Logical; if \code{TRUE}, progress and status messages are suppressed.}
 
-\item{...}{Additional arguments (currently not used).}
+\item{...}{Additional arguments passed to underlying API calls and helper functions.}
 }
 \value{
-A data frame containing unique, cleaned items with their associated item type labels.
+A data frame of generated items with at least the following columns:
+\describe{
+\item{\code{type}}{The label of the item type for each generated item.}
+\item{\code{statement}}{The cleaned and formatted item statement.}
+}
+Duplicate items are removed prior to returning the final data frame.
 }
 \description{
-Generates items using the specified language model (e.g., GPT-3.5, GPT-4o, or open-source models via Groq API). This internal function constructs prompts, handles API interactions, processes the model's output, and ensures that the generated items meet the required format. It supports both default and custom prompt modes.
+This internal function drives the item generation process for a personality inventory.
+It interacts with a language model API (either OpenAI GPT or a Groq-based model) to produce candidate
+items based on provided prompts. Depending on the mode, the function operates as follows:
+\itemize{
+\item In default mode (\code{custom = FALSE}), it automatically constructs prompts using the provided
+\code{item.attributes} (and, optionally, \code{item.type.definitions} and \code{item.examples}) and a
+default system role.
+\item In custom mode (\code{custom = TRUE}), it uses user-supplied prompts (\code{user.prompts}) and a custom
+cleaning function (\code{cleaner_fun}) to parse the language model's output.
+}
+}
+\details{
+For each item type, the function repeatedly calls the language model API until a target number of unique items,
+as specified by \code{target.N}, is generated or until a threshold of consecutive errors or iterations with no new
+items is reached. When \code{adaptive = TRUE}, previously generated items are included in subsequent API calls to
+help reduce redundancy. The function also cleans and deduplicates the generated items before returning the final
+output.
 }

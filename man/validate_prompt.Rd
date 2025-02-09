@@ -54,8 +54,8 @@ and for the final generated items to meet your requirements before generating a 
 
   # Define custom prompts for two traits (e.g., "trait1" and "trait2")
   custom_prompts <- list(
-    trait1 = "Generate three unique, psychometrically robust items to measure trait1. Use the format: <trait>: <item statement>.",
-    trait2 = "Generate three unique, psychometrically robust items to measure trait2. Use the format: <trait>: <item statement>."
+    extraversion = "Generate three unique, psychometrically robust items to measure extraversion from the Big Five model of personality. Use the format: <extraversion>: <item statement>.",
+    openness = "Generate three unique, psychometrically robust items to measure openness from the Big Five model of personality. Use the format: <openness>: <item statement>."
   )
 
   # Define a system role that instructs the language model on how to behave
