@@ -4,7 +4,15 @@
 \alias{compute_EGA}
 \title{Compute EGA}
 \usage{
-compute_EGA(items, EGA.model, embedding, openai.key, silently, ...)
+compute_EGA(
+  items,
+  EGA.model,
+  EGA.algorithm,
+  embedding,
+  openai.key,
+  silently,
+  ...
+)
 }
 \arguments{
 \item{items}{A data frame containing the item statements and types.}

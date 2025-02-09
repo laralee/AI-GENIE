@@ -7,6 +7,7 @@
 get_results(
   items,
   EGA.model,
+  EGA.algorithm,
   embedding.model,
   openai.key,
   item_type,

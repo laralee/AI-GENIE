@@ -23,6 +23,7 @@ AIGENIE_checks(
   items.only,
   adaptive,
   EGA.model,
+  EGA.algorithm,
   embedding.model,
   keep.org,
   plot,

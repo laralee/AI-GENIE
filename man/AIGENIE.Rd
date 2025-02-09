@@ -2,7 +2,7 @@
 % Please edit documentation in R/main.R
 \name{AIGENIE}
 \alias{AIGENIE}
-\title{AI-GENIE}
+\title{AI-GENIE: Automatic Item Generation, Validation, and Reduction}
 \usage{
 AIGENIE(
   item.attributes,
@@ -23,6 +23,7 @@ AIGENIE(
   items.only = FALSE,
   adaptive = TRUE,
   EGA.model = NULL,
+  EGA.algorithm = "walktrap",
   embedding.model = "text-embedding-3-small",
   keep.org = FALSE,
   plot = TRUE,
@@ -33,79 +34,136 @@ AIGENIE(
 )
 }
 \arguments{
-\item{item.attributes}{A required named list containing item type labels and their corresponding attributes. The list have names or identifiers representing item types. Each element should be a character vector of attributes for that item type.}
+\item{item.attributes}{A required named list in which each element is a character vector of attributes for an item type.
+The names of the list elements serve as the item type labels.}
 
-\item{openai.API}{A required character string of your OpenAI API key.}
+\item{openai.API}{A required character string containing your OpenAI API key.}
 
-\item{groq.API}{(Required when using open-source models) A character string of your Groq API key.}
+\item{groq.API}{An optional character string for your Groq API key (required for non-GPT models such as "llama3", "mixtral", or "gemma2").}
 
-\item{custom}{Logical; defaults to \code{FALSE}. Indicates whether you intend to supply your own custom prompts.}
+\item{custom}{Logical; defaults to \code{FALSE}. If \code{TRUE}, the function uses custom prompts (provided via \code{user.prompts})
+and a custom cleaning function (provided via \code{cleaning.fun}).}
 
-\item{user.prompts}{(Required when \code{custom = TRUE}) A named list or data frame of custom prompt strings for each item type. Each prompt must be a single character string associated with an item type label.}
+\item{user.prompts}{(Required when \code{custom = TRUE}) A named list of custom prompt strings, one for each item type.}
 
-\item{item.type.definitions}{An optional named list or data frame providing definitions for each item type. Each definition should be a character string not exceeding 250 characters. This helps the language model understand the item types better. Definitions are included at the beginning of the prompts for their corresponding item types.}
+\item{item.type.definitions}{An optional named list or data frame providing brief definitions (up to 250 characters)
+for each item type. These definitions are prepended to the generated prompts.}
 
-\item{cleaning.fun}{(Required when \code{custom = TRUE}) A text cleaning function that can clean and parse the model's expected text output given your custom prompt. The function must accept exactly one parameter (the model's output) and return a list of cleaned items.}
+\item{cleaning.fun}{(Required when \code{custom = TRUE}) A function to clean and parse the language model's raw output.
+It must accept a single argument (the raw output text) and return a data frame with two columns:
+\code{item} (the item statement) and \code{attribute} (the characteristic targeted).}
 
-\item{system.role}{An optional character string describing the language model's role (e.g., "a professional methodologist and scale developer").}
+\item{system.role}{An optional character string describing the role the language model should assume
+(e.g., "an expert psychometrician and test developer"). If \code{NULL}, a default is generated.}
 
-\item{scale.title}{An optional character string specifying the name of your inventory.}
+\item{scale.title}{An optional character string specifying the title or name of your inventory.}
 
-\item{sub.domain}{An optional character string specifying the inventory's sub-domain or specialty (e.g., "abnormal psychology").}
+\item{sub.domain}{An optional character string specifying the inventory's sub-domain or specialty.}
 
-\item{model}{A character string specifying the model to use for item generation. Defaults to \code{"gpt3.5"}. Options are \code{"gpt3.5"}, \code{"gpt4o"}, \code{"llama3"}, \code{"mixtral"}, or \code{"gemma2"}. A Groq API key is required for \code{"llama3"}, \code{"mixtral"}, or \code{"gemma2"} models.}
+\item{model}{A character string specifying the language model to use. Options include \code{"gpt3.5"}, \code{"gpt4o"},
+\code{"llama3"}, \code{"mixtral"}, or \code{"gemma2"}. Defaults to \code{"gpt3.5"}.}
 
-\item{item.examples}{An optional character vector of well-crafted, high-quality example item strings. If premium items are not readily available, it is recommended to leave this parameter as \code{NULL}.}
+\item{item.examples}{An optional character vector of high-quality example item statements.}
 
-\item{target.N}{An integer or integer vector specifying the target number of items to generate. Defaults to \code{100}. If an integer is provided, the function will generate approximately equal numbers of items per item type summing to this total. If an unequal distribution is desired, provide an integer vector specifying the target number of items for each item type, in the same order as the names of \code{item.attributes} or \code{user.prompts}. Each item type must have a target of at least 15 items, and the total must be at least 50 items. This requirement does not apply if only generating items (see \code{items.only}).}
+\item{target.N}{An integer or vector of integers specifying the target number of items to generate.
+If a single number is provided, it is approximately divided among the item types;
+if a vector, each element corresponds to the target for the respective item type.}
 
-\item{temperature}{Numeric; defaults to \code{1}. A value between \code{0} and \code{2} setting the temperature of the language model.}
+\item{temperature}{Numeric; defaults to \code{1}. Controls the randomness of the language model's output (range 0–2).}
 
-\item{top.p}{Numeric; defaults to \code{1}. A value between \code{0} and \code{1} setting the top-p parameter of the language model.}
+\item{top.p}{Numeric; defaults to \code{1}. Sets the top-p sampling parameter for the language model (range 0–1).}
 
-\item{items.only}{Logical; defaults to \code{FALSE}. Set to \code{TRUE} if you only want the items generated without further processing. When \code{TRUE}, item pool reduction through AI-GENIE is skipped, and the function returns a data frame of the generated items.}
+\item{items.only}{Logical; defaults to \code{FALSE}. If \code{TRUE}, the function stops after generating items
+and returns a data frame of items without performing further reduction or analysis.}
 
-\item{adaptive}{Logical; defaults to \code{TRUE}. Indicates whether to use an adaptive prompting approach (recommended). When \code{TRUE}, the language model receives a list of previously generated items to avoid redundancy. Set to \code{FALSE} to skip this step if context length is a concern.}
+\item{adaptive}{Logical; defaults to \code{TRUE}. If \code{TRUE}, previously generated items are incorporated
+into subsequent prompts to reduce redundancy.}
 
-\item{EGA.model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
+\item{EGA.model}{An optional character string specifying the Exploratory Graph Analysis model to use
+(e.g., \code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both are evaluated and the one with
+the highest NMI is selected.}
 
-\item{embedding.model}{A character string specifying the OpenAI embedding model that should be used. The options are \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}. Defaults to \code{"text-embedding-3-small"}.}
+\item{EGA.algorithm}{A character string specifying the clustering algorithm for EGA (default: \code{"walktrap"}).}
 
-\item{keep.org}{Logical; defaults to \code{FALSE}. When \code{TRUE}, returns a data frame of the original item pool.}
+\item{embedding.model}{A character string specifying the OpenAI embedding model to use
+(e.g., \code{"text-embedding-3-small"}). Defaults to \code{"text-embedding-3-small"}.}
 
-\item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display the main summary network plots.}
+\item{keep.org}{Logical; defaults to \code{FALSE}. If \code{TRUE}, the original generated item pool and/or embeddings
+are retained in the output.}
 
-\item{plot.stability}{Logical; defaults to \code{FALSE}. Specifies whether to display the secondary network stability plots.}
+\item{plot}{Logical; defaults to \code{TRUE}. If \code{TRUE}, the function generates network plots comparing
+the pre- and post-reduction item pools.}
 
-\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction. Setting this parameter to \code{TRUE} significantly increases computational expense. Changing this value will NOT change item reduction outcome.}
+\item{plot.stability}{Logical; defaults to \code{FALSE}. If \code{TRUE}, additional network stability plots are produced.}
 
-\item{silently}{Logical; defaults to \code{FALSE}. When \code{TRUE}, suppresses console output.}
+\item{calc.final.stability}{Logical; defaults to \code{FALSE}. If \code{TRUE}, the function computes bootstrapped stability
+measures before and after reduction (which may increase computation time).}
+
+\item{silently}{Logical; defaults to \code{FALSE}. If \code{TRUE}, console output is suppressed.}
+
+\item{...}{Additional arguments passed to underlying functions in the pipeline.}
 }
 \value{
-A list containing:
+If \code{items.only = TRUE}, returns a data frame of generated items (with columns such as \code{statement} and \code{attribute}).
+Otherwise, returns a list with two elements:
 \describe{
-\item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.}
-\item{\code{final_ega_obj}}{The final EGA object after reduction.}
-\item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
-\item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
-\item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
-\item{\code{embeddings}}{The embeddings generated for the items.}
-\item{\code{sparse_embeddings}}{The sparsified embeddings generated for the items}
-\item{\code{embeddings_used}}{The embeddings used to generate the full-sample plots and overall stats (either the full embeddings or the sparse embeddings)}
-\item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
-\item{\code{selected_model}}{The EGA model used throughout the pipeline.}
-\item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
-\item{\code{start_nmi}}{The NMI of the original item pool.}
-\item{\code{start_N}}{The starting sample size (number of items).}
-\item{\code{final_N}}{The final sample size after reduction.}
-\item{\code{original_items (optional)}}{(ONLY returns if \code{keep.org} is \code{TRUE}) The original sample generated.}
+\item{\code{overall_sample}}{
+A list containing the overall sample-level analysis results:
+\itemize{
+\item \code{main_result}: A data frame of the refined item pool after reduction, including columns such as \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.
+\item \code{final_ega_obj}: The final EGA object after reduction.
+\item \code{final_bootega_obj}: The final bootstrapped EGA (bootEGA) object after reduction (if stability analysis was performed).
+\item \code{initial_ega_obj}: The initial EGA object computed on the full generated pool.
+\item \code{initial_bootega_obj}: The initial bootEGA object computed on the redundancy-reduced items.
+\item \code{selected_model}: The EGA model used throughout the pipeline (either as specified or selected based on NMI).
+\item \code{nmi}: The final Normalized Mutual Information (NMI) value after reduction.
+\item \code{start_nmi}: The NMI value computed on the original generated item pool.
+\item \code{start_N}: The number of items in the initial generated pool.
+\item \code{final_N}: The number of items in the final refined pool.
+\item \code{network_plot}: A network plot object comparing the pre- and post-reduction item networks.
+\item \code{stability_plot}: A stability plot object (if \code{calc.final.stability = TRUE}).
+\item \code{embeddings}: A list of embeddings used in the analysis. This list includes:
+\itemize{
+\item \code{full}: The full embeddings matrix for the reduced items.
+\item \code{sparse}: A sparsified version of the embeddings.
+\item \code{embed_type_used}: A string indicating whether "full" or "sparse" embeddings were ultimately used.
+}
+\item Optionally, if \code{keep.org = TRUE}, additional elements are included:
+\itemize{
+\item \code{original_sample_items}: The original generated item pool as a data frame.
+\item \code{original_sample_full}: The full embeddings matrix for the original items.
+\item \code{original_sample_sparse}: A sparsified version of the original embeddings.
+}
+}
+}
+\item{\code{item_type_level}}{
+A named list containing analysis results for each individual item type.
+Each element is a list with the corresponding output (similar in structure to the overall sample output)
+for that item type.
+}
 }
 }
 \description{
-Generate, validate, and assess your items for quality and redundancy using AI-GENIE (Automatic Item Generation and Validation via Network-Integrated Evaluation). This function generates items using your chosen language model, embeds the items, and performs AI-GENIE item validation and redundancy reduction to refine the item pool. You can either have the function construct prompts for you using provided item attributes and optional high-quality item examples (recommended), or supply your own custom prompts. If providing custom prompts, you must also provide a text cleaning function that can parse and extract item statements from the model output.
+This function orchestrates the full AI-GENIE pipeline for developing item pools for psychological inventories.
+It operates in two modes:
+\itemize{
+\item In the default (non-custom) mode, prompts are automatically constructed from a provided
+named list of item attributes (and, optionally, item type definitions and example items).
+The language model is then used to generate candidate items.
+\item In custom mode (\code{custom = TRUE}), the user provides their own prompts (via \code{user.prompts})
+and a custom cleaning function (via \code{cleaning.fun}) to parse the language model's output.
+}
+After item generation, if \code{items.only = FALSE}, the function passes the generated items to a
+reduction pipeline that:
+\itemize{
+\item Embeds the items using the specified embedding model.
+\item Performs redundancy removal via Unique Variable Analysis (UVA).
+\item Conducts Exploratory Graph Analysis (EGA) and bootstrapped EGA to refine the item pool.
+\item Selects the optimal EGA model based on Normalized Mutual Information (NMI).
+}
 }
 \examples{
-\dontrun{
+#' \dontrun{
 
 ########################################################
 #### Example 1: Using AI-GENIE with Default Prompts ####
@@ -263,4 +321,5 @@ personality.inventory.results.custom <- AIGENIE(
 # View the final item pool
 View(personality.inventory.results.custom$main_result)
 }
+
 }

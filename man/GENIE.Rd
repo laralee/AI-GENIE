@@ -2,12 +2,14 @@
 % Please edit documentation in R/main.R
 \name{GENIE}
 \alias{GENIE}
-\title{GENIE (Item Validation and Reduction without Item Generation)}
+\title{GENIE: Item Validation and Reduction (Without Item Generation)}
 \usage{
 GENIE(
   items,
   openai.API,
   EGA.model = NULL,
+  EGA.algorithm = "walktrap",
+  embedding.model = "text-embedding-3-small",
   plot = TRUE,
   plot.stability = FALSE,
   calc.final.stability = FALSE,
@@ -16,40 +18,78 @@ GENIE(
 )
 }
 \arguments{
-\item{items}{A required data frame containing your item statements and item type labels. The data frame should have two columns: one containing the item statements and one containing the item type labels. The column names do not need to be specific; the function will determine which column contains the item statements and which contains the item type labels. There must be at least two distinct item types which each contain at least 15 items. The total number of unique items should be at least 50.}
+\item{items}{A required data frame containing the item pool. This data frame must include at least three columns:
+\code{statement} (the item text), \code{type} (the item type label), and \code{attribute} (the associated attribute/characteristic).
+The pool should contain at least 50 unique items overall, with at least 15 items per distinct item type.}
 
-\item{openai.API}{A required character string of your OpenAI API key.}
+\item{openai.API}{A required character string containing your OpenAI API key.}
 
-\item{EGA.model}{A character string specifying the model to use with Exploratory Graph Analysis (EGA). Options are \code{"tmfg"} or \code{"glasso"}. Defaults to \code{tmfg}. If set to \code{NULL}, both models are tested, and the one yielding the best Normalized Mutual Information (NMI) is returned.}
+\item{EGA.model}{An optional character string specifying the EGA model to use (e.g., \code{"tmfg"} or \code{"glasso"}). If set to \code{NULL},
+both models are evaluated, and the one with the highest Normalized Mutual Information (NMI) is selected.}
 
-\item{plot}{Logical; defaults to \code{TRUE}. Specifies whether to display summary network plots.}
+\item{EGA.algorithm}{A character string specifying the clustering algorithm for EGA. Options include \code{"walktrap"}, \code{"louvain"}, or \code{"leiden"}. Defaults to \code{"walktrap"}.}
 
-\item{plot.stability}{Logical; defaults to \code{FALSE}. Specifies whether to display the secondary network stability plots.}
+\item{embedding.model}{A character string specifying the OpenAI embedding model to use (e.g., \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}).
+Defaults to \code{"text-embedding-3-small"}.}
 
-\item{calc.final.stability}{Logical; defaults to \code{FALSE}. Specifies whether to compute the stability of the item pool before and after item reduction. Setting this parameter to \code{TRUE} significantly increases computational expense. Changing this value will NOT change item reduction outcome.}
+\item{plot}{Logical; defaults to \code{TRUE}. If \code{TRUE}, network plots comparing the item pool before and after reduction are generated.}
 
-\item{silently}{Logical; defaults to \code{FALSE}. When \code{TRUE}, suppresses console output.}
+\item{plot.stability}{Logical; defaults to \code{FALSE}. If \code{TRUE}, secondary network stability plots are generated.}
+
+\item{calc.final.stability}{Logical; defaults to \code{FALSE}. If \code{TRUE}, bootstrapped stability analysis is performed (this may significantly increase computation time).}
+
+\item{silently}{Logical; defaults to \code{FALSE}. If \code{TRUE}, console output is suppressed.}
+
+\item{...}{Additional arguments passed to underlying functions in the pipeline.}
 }
 \value{
-A list containing:
+A list (inherited from \code{run_pipeline}) containing:
 \describe{
-\item{\code{main_result}}{A data frame of the item pool after AI-GENIE reduction. The data frame has the columns \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.}
-\item{\code{final_ega_obj}}{The final EGA object after reduction.}
-\item{\code{final_bootega_obj}}{The final bootEGA object after reduction.}
-\item{\code{initial_ega_obj}}{The initial EGA object with the entire item pool.}
-\item{\code{initial_bootega_obj}}{The initial bootEGA object generated from redundancy-reduced data.}
-\item{\code{embeddings}}{The embeddings generated for the items.}
-\item{\code{embedding_type}}{The type of embeddings used ("sparse" or "full").}
-\item{\code{selected_model}}{The EGA model used throughout the pipeline.}
-\item{\code{nmi}}{The Normalized Mutual Information (NMI) of the final item pool.}
-\item{\code{start_nmi}}{The NMI of the original item pool.}
-\item{\code{start_N}}{The starting sample size (number of items).}
-\item{\code{final_N}}{The final sample size after reduction.}
-\item{\code{original_items (optional)}}{(ONLY returns if \code{keep.org} is \code{TRUE}) The original sample generated.}
+\item{\code{main_result}}{
+A data frame of the refined item pool after AI-GENIE reduction. It typically includes columns such as \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.
+}
+\item{\code{final_ega_obj}}{
+The final Exploratory Graph Analysis (EGA) object computed on the reduced item pool.
+}
+\item{\code{final_bootega_obj}}{
+The final bootstrapped EGA (bootEGA) object after reduction (if stability analysis was performed).
+}
+\item{\code{initial_ega_obj}}{
+The initial EGA object computed on the entire (pre-reduction) item pool.
+}
+\item{\code{initial_bootega_obj}}{
+The initial bootEGA object computed on the redundancy-reduced items.
+}
+\item{\code{embeddings}}{
+A list of embeddings generated during the analysis. This list includes the "full" and "sparse" embeddings as well as an indicator (\code{embed_type_used})
+specifying which was used for the final analysis.
+}
+\item{\code{selected_model}}{
+The EGA model used throughout the pipeline (either as specified by the user or chosen based on optimal NMI).
+}
+\item{\code{nmi}}{
+The final Normalized Mutual Information (NMI) value after reduction.
+}
+\item{\code{start_nmi}}{
+The NMI value computed on the original (pre-reduction) item pool.
+}
+\item{\code{start_N}}{
+The number of items in the original item pool.
+}
+\item{\code{final_N}}{
+The number of items in the final reduced item pool.
+}
+\item Optionally, if additional parameters were set (e.g., \code{keep.org = TRUE}), the output may also include:
+\code{original_items} (the original item pool) and/or extra embedding matrices.
 }
 }
 \description{
-Validate and assess your existing items for quality and redundancy using AI-GENIE (Automatic Item Generation and Validation via Network-Integrated Evaluation). This function embeds user-provided items and performs AI-GENIE item validation and redundancy reduction to refine the item pool.
+This function validates an existing item pool and performs redundancy reduction and network-based quality assessment using AI-GENIE. It is intended for cases where the item pool is already generated. GENIE:
+\itemize{
+\item Validates the provided item data using \code{GENIE_checks} (ensuring correct format, absence of missing or duplicate items, and that item attributes match the data).
+\item Embeds the items using the specified OpenAI embedding model.
+\item Runs the reduction pipeline (via \code{run_pipeline}) to remove redundant items and to perform Exploratory Graph Analysis (EGA) and bootstrapped EGA for further refinement.
+}
 }
 \examples{
 \dontrun{

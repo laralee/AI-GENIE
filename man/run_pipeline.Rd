@@ -9,6 +9,7 @@ run_pipeline(
   openai.key,
   title = "Networks Before and After AI-Genie",
   EGA.model = NULL,
+  EGA.algorithm,
   embedding.model,
   keep.org = FALSE,
   plot = TRUE,

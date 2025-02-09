@@ -8,6 +8,8 @@ GENIE_checks(
   item.data,
   openai.API,
   EGA.model,
+  EGA.algorithm,
+  embedding.model,
   plot,
   plot.stability,
   calc.final.stability,
