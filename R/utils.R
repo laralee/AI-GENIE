@@ -646,8 +646,7 @@ generate_output <- function(openai.API, groq.API,
     model # Default to the provided model name if not in the list
   )
 
-
-  # Determine which model to use
+  # Determine which API to use
   if (grepl("gpt", model)) {
     openai <- reticulate::import("openai")
     openai$api_key <- openai.API
@@ -660,21 +659,19 @@ generate_output <- function(openai.API, groq.API,
     max_tokens_set <- 7000L
   }
 
-  if(is.null(system.role)){
+  # Default system role if not provided
+  if (is.null(system.role)) {
     system.role <- "You are an expert psychometrician and test developer. Your task is to create high-quality, psychometrically robust items."
   }
 
   item.types <- names(user.prompts)
-
-
   responses <- list()
 
   for (i in seq_along(item.types)) {
-
     current_label <- item.types[[i]]
 
     # Print "Generating items for..." message
-    if(!silently){
+    if (!silently) {
       cat(paste("Generating responses for", current_label, "... "))
     }
 
@@ -683,25 +680,49 @@ generate_output <- function(openai.API, groq.API,
       list("role" = "user", "content" = user.prompts[[current_label]])
     )
 
-    for (i in 1:N.runs) {
-    #API Call with Timeout
-    R.utils::withTimeout({
-      response <- generate_FUN( model = model,
-                messages = messages_list,
-                temperature = temperature,
-                max_tokens = max_tokens_set,
-                top_p = top.p
-              )
-            }, timeout = 20, onTimeout = "error")
+    for (j in 1:N.runs) {
+      retry_count <- 0
+      success <- FALSE
 
-      responses[[current_label]][[i]] <- response$choices[[1]]$message$content
+      while (!success && retry_count < 10) {  # Retry up to 10 times
+        result <- tryCatch({
+          # API Call with Timeout
+          R.utils::withTimeout({
+            response <- generate_FUN(
+              model = model,
+              messages = messages_list,
+              temperature = temperature,
+              max_tokens = max_tokens_set,
+              top_p = top.p
+            )
+          }, timeout = 20, onTimeout = "error")
+
+          # Store response and break loop on success
+          responses[[current_label]][[j]] <- response$choices[[1]]$message$content
+          success <- TRUE  # Mark success
+
+        }, error = function(e) {
+          retry_count <<- retry_count + 1  # Increment retry count
+          if (!silently) {
+            cat(paste0("\nError encountered (", retry_count, "/10). Retrying...\n"))
+          }
+          Sys.sleep(1)  # Wait 1 second before retrying
+        })
+
+        if (retry_count == 10) {
+          if (!silently) {
+            cat("\nFailed 10 times. Skipping this request.\n")
+          }
+          break
+        }
+      }
     }
 
-    if(!silently){
-    cat("Done.\n")}
-
+    if (!silently) {
+      cat("Done.\n")
+    }
   }
 
   return(responses)
-
 }
+
