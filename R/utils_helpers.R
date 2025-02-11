@@ -1011,8 +1011,11 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
 
   if (calc.final.stability) {
     verbose <- !silently
+    temp <- colnames(embedding_use)
+    colnames(embedding_use) <- items$ID
     bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
                                   seed = 1234, verbose = verbose, model = model_used, algorithm = EGA.algorithm)
+    colnames(embedding_use) <- temp
 
     embedding_use <- if (embedding_type == "full") embedding_reduced else embedding_reduced_sparse
     temp <- colnames(embedding_use)
