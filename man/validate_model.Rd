@@ -4,7 +4,7 @@
 \alias{validate_model}
 \title{Validate Model}
 \usage{
-validate_model(model)
+validate_model(model, silently)
 }
 \arguments{
 \item{model}{A character string specifying the model to be used (e.g., "gpt3.5", "gpt4o", "llama3").}

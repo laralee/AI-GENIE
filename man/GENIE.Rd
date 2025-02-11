@@ -43,44 +43,35 @@ Defaults to \code{"text-embedding-3-small"}.}
 \item{...}{Additional arguments passed to underlying functions in the pipeline.}
 }
 \value{
-A list (inherited from \code{run_pipeline}) containing:
+Returns a list with two elements:
 \describe{
-\item{\code{main_result}}{
-A data frame of the refined item pool after AI-GENIE reduction. It typically includes columns such as \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.
+\item{\code{overall_sample}}{
+A list containing the overall sample-level analysis results:
+\itemize{
+\item \code{main_result}: A data frame of the refined item pool after reduction, including columns such as \code{ID}, \code{type}, \code{statement}, and \code{EGA_communities}.
+\item \code{final_ega_obj}: The final EGA object after reduction.
+\item \code{final_bootega_obj}: The final bootstrapped EGA (bootEGA) object after reduction (if stability analysis was performed).
+\item \code{initial_ega_obj}: The initial EGA object computed on the full generated pool.
+\item \code{initial_bootega_obj}: The initial bootEGA object computed on the redundancy-reduced items.
+\item \code{selected_model}: The EGA model used throughout the pipeline (either as specified or selected based on NMI).
+\item \code{nmi}: The final Normalized Mutual Information (NMI) value after reduction.
+\item \code{start_nmi}: The NMI value computed on the original generated item pool.
+\item \code{start_N}: The number of items in the initial generated pool.
+\item \code{final_N}: The number of items in the final refined pool.
+\item \code{network_plot}: A network plot object comparing the pre- and post-reduction item networks.
+\item \code{stability_plot}: A stability plot object (if \code{calc.final.stability = TRUE}).
+\item \code{embeddings}: A list of embeddings used in the analysis. This list includes:
+\itemize{
+\item \code{full}: The full embeddings matrix for the reduced items.
+\item \code{sparse}: A sparsified version of the embeddings.
+\item \code{embed_type_used}: A string indicating whether "full" or "sparse" embeddings were ultimately used.
 }
-\item{\code{final_ega_obj}}{
-The final Exploratory Graph Analysis (EGA) object computed on the reduced item pool.
 }
-\item{\code{final_bootega_obj}}{
-The final bootstrapped EGA (bootEGA) object after reduction (if stability analysis was performed).
 }
-\item{\code{initial_ega_obj}}{
-The initial EGA object computed on the entire (pre-reduction) item pool.
-}
-\item{\code{initial_bootega_obj}}{
-The initial bootEGA object computed on the redundancy-reduced items.
-}
-\item{\code{embeddings}}{
-A list of embeddings generated during the analysis. This list includes the "full" and "sparse" embeddings as well as an indicator (\code{embed_type_used})
-specifying which was used for the final analysis.
-}
-\item{\code{selected_model}}{
-The EGA model used throughout the pipeline (either as specified by the user or chosen based on optimal NMI).
-}
-\item{\code{nmi}}{
-The final Normalized Mutual Information (NMI) value after reduction.
-}
-\item{\code{start_nmi}}{
-The NMI value computed on the original (pre-reduction) item pool.
-}
-\item{\code{start_N}}{
-The number of items in the original item pool.
-}
-\item{\code{final_N}}{
-The number of items in the final reduced item pool.
-}
-\item{\code{original_items}}{
-(Optional) If \code{keep.org = TRUE}, the output includes the original item pool and extra embedding matrices.
+\item{\code{item_type_level}}{
+A named list containing analysis results for each individual item type.
+Each element is a list with the corresponding output (with the same structure as the the overall sample output)
+for that item type.
 }
 }
 }
