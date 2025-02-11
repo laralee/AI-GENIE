@@ -19,6 +19,8 @@ compute_EGA(
 
 \item{EGA.model}{A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
 
+\item{EGA.algorithm}{A character string specifying the EGA algorithm to be used.}
+
 \item{embedding}{A matrix of embeddings for the items.}
 
 \item{openai.key}{A character string of your OpenAI API key.}

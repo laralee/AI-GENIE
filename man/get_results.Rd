@@ -21,6 +21,10 @@ get_results(
 
 \item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.}
 
+\item{EGA.algorithm}{A string of the EGA algorithm to be used}
+
+\item{embedding.model}{A string of the OpenAI embedding model to be used}
+
 \item{openai.key}{A character string of your OpenAI API key.}
 
 \item{item_type}{A character string of the current item type undergoing reduction}

@@ -19,6 +19,14 @@ remove_instabilities(
 
 \item{cut.off}{Numeric; the stability cutoff value. Defaults to \code{0.75}.}
 
+\item{verbose}{A logical flag that specifies whether the console output should be displayed}
+
+\item{seed}{A seed to make the results reproducible}
+
+\item{model}{A string of the EGA model to be used in BootEGA}
+
+\item{EGA.algorithm}{A string of the EGA algorithm to be used}
+
 \item{...}{Additional arguments passed to the \code{\link[EGAnet]{bootEGA}} function.}
 }
 \value{

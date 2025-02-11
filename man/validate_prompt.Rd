@@ -17,9 +17,9 @@ validate_prompt(
 )
 }
 \arguments{
-\item{openai.API}{Optional. A character string containing your OpenAI API key.}
+\item{openai.API}{Optional (Required if using a GPT model). A character string containing your OpenAI API key.}
 
-\item{groq.API}{Optional. A character string containing your Groq API key.}
+\item{groq.API}{Optional (Required if using a Groq model). A character string containing your Groq API key.}
 
 \item{user.prompts}{A named list of custom prompt strings for each item type.}
 
@@ -53,7 +53,7 @@ and for the final generated items to meet your requirements before generating a 
   # Replace with your actual OpenAI API key
   key <- "INSERT YOUR KEY HERE"
 
-  # Define custom prompts for two traits (e.g., "trait1" and "trait2")
+  # Define custom prompts for two traits (e.g., "extraversion" and "openness")
   custom_prompts <- list(
     extraversion = "Generate three unique, psychometrically robust items to measure extraversion from the Big Five model of personality. Use the format: <extraversion>: <item statement>.",
     openness = "Generate three unique, psychometrically robust items to measure openness from the Big Five model of personality. Use the format: <openness>: <item statement>."

@@ -76,11 +76,16 @@ for that item type.
 }
 }
 \description{
-This function validates an existing item pool and performs redundancy reduction and network-based quality assessment using AI-GENIE. It is intended for cases where the item pool is already generated. GENIE:
+This function processes an existing item pool to validate and refine item selection using AI-GENIE.
+It applies network-based quality assessment, redundancy reduction, and stability evaluation.
+Unlike \code{AIGENIE}, this function does not generate new items but instead focuses on optimizing
+an existing dataset.
+}
+\details{
+The function performs the following steps:
 \itemize{
-\item Validates the provided item data using \code{GENIE_checks} (ensuring correct format, absence of missing or duplicate items, and that item attributes match the data).
 \item Embeds the items using the specified OpenAI embedding model.
-\item Runs the reduction pipeline (via \code{run_pipeline}) to remove redundant items and to perform Exploratory Graph Analysis (EGA) and bootstrapped EGA for further refinement.
+\item Runs the reduction pipeline to remove redundant items via Unique Variable Analysis (UVA) and validate items via bootstrapped Exploritory Graph Analysis (bootEGA) for further refinement.
 }
 }
 \examples{

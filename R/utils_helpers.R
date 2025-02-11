@@ -137,13 +137,24 @@ create.system.role.prompt <- function(system.role, item.types, scale.title, sub.
 }
 
 
-# Flatten text ----
+#' Flatten Text
+#'
+#' Removes the punctuation from a string and converts it to lowercase.
+#'
+#' @param text A string that should be flattened
 flatten_text <- function(text)
 {
   tolower(gsub("[[:punct:]]", "", text))
 }
 
-# DeepSeek format ----
+
+#' Deep Seek Output Cleaning
+#'
+#' Cleans the output text based on the expected typical output of the DeepSeek model.
+#'
+#' @param response A string that contains the output of the LLM model
+#' @param split_content A vector of the item attributes stemmed (not currently used)
+#' @returns A list of the characteristics and items extracted from the model output
 deepseek_format <- function(response, split_content) {
 
   # Extract the response content
@@ -170,7 +181,13 @@ deepseek_format <- function(response, split_content) {
 }
 
 
-# Gemma-2 format ----
+#' Gemma 2 Output Cleaning
+#'
+#' Cleans the output text based on the expected typical output of the Gemma 2 model.
+#'
+#' @param response A string that contains the output of the LLM model
+#' @param split_content A vector of the item attributes stemmed (not currently used)
+#' @returns A list of the characteristics and items extracted from the model output
 gemma_format <- function(response, split_content)
 {
 
@@ -189,7 +206,13 @@ gemma_format <- function(response, split_content)
 
 }
 
-# Mixtral format ----
+#' Mixtral Output Cleaning
+#'
+#' Cleans the output text based on the expected typical output of the Mixtral model.
+#'
+#' @param response A string that contains the output of the LLM model
+#' @param split_content A vector of the item attributes stemmed
+#' @returns A list of the characteristics and items extracted from the model output
 mixtral_format <- function(response, split_content)
 {
 
@@ -216,7 +239,14 @@ mixtral_format <- function(response, split_content)
 
 }
 
-# LLAMA-3 format ----
+
+#' Llama Output Cleaning
+#'
+#' Cleans the output text based on the expected typical output of the Llama model.
+#'
+#' @param response A string that contains the output of the LLM model
+#' @param split_content A vector of the item attributes stemmed
+#' @returns A list of the characteristics and items extracted from the model output
 llama_format <- function(response, split_content)
 {
 
@@ -250,7 +280,13 @@ llama_format <- function(response, split_content)
 
 }
 
-# Try formats ----
+#' Cleaning Function that Cleans the Outputs using All Cleaning Formats
+#'
+#' Cleans the output text based on all of the various formats (Gemma 2, DeepSeek, Mixtral, and Llama)
+#'
+#' @param response A string that contains the output of the LLM model
+#' @param split_content A vector of the item attributes stemmed
+#' @returns A list of the characteristics and items extracted from the model output if the formatting is successful. Otherwise, an empty list is returned.
 try_formats <- function(response, split_content)
 {
   # Try DeepSeek first
@@ -330,10 +366,11 @@ try_formats <- function(response, split_content)
 #' Generates embeddings for the provided item statements using OpenAI's embedding model.
 #'
 #' @param items A data frame containing the item statements. Must have a column named \code{statement}.
+#' @param embedding.model A string containing the name of the OpenAI embedding model to be used.
 #' @param dimensions An optional integer specifying the number of dimensions for the embeddings. Defaults to \code{1536}.
 #' @param openai.key A character string of your OpenAI API key.
 #' @return A matrix of embeddings where each column corresponds to an item statement.
-get_embeddings <- function(items, embedding.model, dimensions = NULL, openai.key, ...)
+get_embeddings <- function(items, embedding.model, dimensions = 1536, openai.key, ...)
 {
 
   # Set up OpenAI
@@ -422,6 +459,10 @@ remove_redundancies <- function(embedding, ...)
 #'
 #' @param items A data matrix or data frame of items after redundancy removal.
 #' @param cut.off Numeric; the stability cutoff value. Defaults to \code{0.75}.
+#' @param verbose A logical flag that specifies whether the console output should be displayed
+#' @param seed A seed to make the results reproducible
+#' @param model A string of the EGA model to be used in BootEGA
+#' @param EGA.algorithm A string of the EGA algorithm to be used
 #' @param ... Additional arguments passed to the \code{\link[EGAnet]{bootEGA}} function.
 #' @return A data matrix or data frame with unstable items removed.
 remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, EGA.algorithm, ...) {
@@ -496,6 +537,8 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, EG
 #'
 #' @param items A data frame containing the item statements and types.
 #' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}). If \code{NULL}, both models are evaluated, and the best one is selected.
+#' @param EGA.algorithm A string of the EGA algorithm to be used
+#' @param embedding.model A string of the OpenAI embedding model to be used
 #' @param openai.key A character string of your OpenAI API key.
 #' @param item_type A character string of the current item type undergoing reduction
 #' @param keep.org A logical that specifies whether or not the user wants to keep the original items
@@ -582,19 +625,6 @@ get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai
 }
 
 
-
-#' Flatten Text
-#'
-#' Processes text by converting it to lowercase and removing punctuation.
-#'
-#' @param text A character string or vector to be flattened.
-#' @return A character string or vector with text converted to lowercase and punctuation removed.
-flatten_text <- function(text)
-{
-  tolower(gsub("[[:punct:]]", "", text))
-}
-
-
 #' Print Results
 #'
 #' Displays a summary of the AI-GENIE analysis results, including the EGA model used, embedding type, starting and final number of items, and NMI values before and after reduction. The summary includes the number of iterations for both UVA (Unique Variable Analysis) and bootstrapped EGA steps.
@@ -632,6 +662,7 @@ print_results<-function(obj){
 #'
 #' @param items A data frame containing the item statements and types.
 #' @param EGA.model A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.algorithm A character string specifying the EGA algorithm to be used.
 #' @param embedding A matrix of embeddings for the items.
 #' @param openai.key A character string of your OpenAI API key.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
@@ -822,7 +853,6 @@ compute_EGA <- function(items, EGA.model, EGA.algorithm, embedding, openai.key, 
 #' @param current_label Character; the label of the current item type being processed. Optional.
 #' @param max_consecutive_errors Integer; the maximum number of allowed consecutive errors/no new items before stopping. Defaults to \code{10}.
 #' @param min_unique_items Integer; the minimum number of unique items required to continue. Defaults to \code{3}.
-#'
 #' @return Logical; returns \code{TRUE} to continue the generation process, or \code{FALSE} to stop.
 handle_error_logic <- function(error_count, unique_items_generated, error_type, current_label = NULL,
                                max_consecutive_errors = 10, min_unique_items = 3) {
@@ -863,6 +893,25 @@ handle_error_logic <- function(error_count, unique_items_generated, error_type, 
   return(TRUE)
 }
 
+
+
+#' Compute EGA on the full sample
+#'
+#' Computes the Exploratory Graph Analysis (EGA) steps using the specified EGA model on the entire sample (i.e., not item-wise). Also determines the best embedding type to use and EGA model.
+#'
+#' @param embedding A matrix of embeddings for the all of the items.
+#' @param embedding_reduced A matrix of embeddings for the items selected by AIGENIE.
+#' @param items A data frame containing the item statements and types.
+#' @param items_reduced A data frame containing the item statements and types for the items selected by AIGENIE.
+#' @param truth A vector of the items' attribute assignment as generated by the model or coded in a provided data frame.
+#' @param truth_reduced A vector of the items' attribute assignment as generated by the model or coded in a provided data frame for the items selected by AIGENIE.
+#' @param EGA.model A character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.algorithm A character string specifying the EGA algorithm to be used.
+#' @param title A character string of the title of the inventory
+#' @param silently Logical; if \code{TRUE}, suppresses console output.
+#' @param calc.final.stability Logical; a flag that determines whether stability should be calculated for the full sample.
+#' @param ... Additional arguments passed to underlying functions.
+#' @return A list containing the main results, final and initial EGA and bootEGA objects, embeddings, NMI values, and item counts before and after reduction.
 compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_reduced, truth, truth_reduced,
                                     EGA.model, EGA.algorithm, title, calc.final.stability, silently) {
   # Assign unique IDs to items for later mapping
@@ -1003,6 +1052,13 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
 }
 
 
+#' Clean the EGA Output
+#'
+#' Removes the items that were not assigned to a community silently should there be any.
+#'
+#' @param ega_obj The EGA object that is returned by the EGAnet function
+#' @param item_set A data frame that contains the items and there attributes, types, and IDs.
+#' @return A list containing the EGA object and the item set with any of the items that did not belong to a community removed
 clean_EGA_output <- function(ega_obj, item_set) {
   # ega_obj: the EGA object returned by EGA.fit or bootEGA
   # item_set: the matrix (or data frame) whose columns correspond to items analyzed in ega_obj

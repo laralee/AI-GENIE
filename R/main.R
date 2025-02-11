@@ -39,7 +39,8 @@
 #' @param scale.title An optional character string specifying the title or name of your inventory.
 #' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
 #' @param model A character string specifying the language model to use. Options include \code{"gpt3.5"}, \code{"gpt4o"},
-#'              \code{"llama3"}, \code{"mixtral"}, \code{"deepseek"}, or \code{"gemma2"}. Defaults to \code{"gpt3.5"}.
+#'              \code{"llama3"}, \code{"mixtral"}, \code{"deepseek"}, or \code{"gemma2"}.
+#'              The parameter also accepts an API alias directly, if a specific model version is desired. Defaults to \code{"gpt3.5"}.
 #' @param item.examples An optional character vector of high-quality example item statements.
 #' @param target.N An integer or vector of integers specifying the target number of items to generate.
 #'                 If a single number is provided, it is approximately divided among the item types;
@@ -388,11 +389,15 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 
 #' GENIE: Item Validation and Reduction (Without Item Generation)
 #'
-#' This function validates an existing item pool and performs redundancy reduction and network-based quality assessment using AI-GENIE. It is intended for cases where the item pool is already generated. GENIE:
+#' This function processes an existing item pool to validate and refine item selection using AI-GENIE.
+#' It applies network-based quality assessment, redundancy reduction, and stability evaluation.
+#' Unlike \code{AIGENIE}, this function does not generate new items but instead focuses on optimizing
+#' an existing dataset.
+#'
+#' The function performs the following steps:
 #' \itemize{
-#'   \item Validates the provided item data using \code{GENIE_checks} (ensuring correct format, absence of missing or duplicate items, and that item attributes match the data).
 #'   \item Embeds the items using the specified OpenAI embedding model.
-#'   \item Runs the reduction pipeline (via \code{run_pipeline}) to remove redundant items and to perform Exploratory Graph Analysis (EGA) and bootstrapped EGA for further refinement.
+#'   \item Runs the reduction pipeline to remove redundant items via Unique Variable Analysis (UVA) and validate items via bootstrapped Exploritory Graph Analysis (bootEGA) for further refinement.
 #' }
 #'
 #' @param items A required data frame containing the item pool. This data frame must include at least three columns:
@@ -543,8 +548,8 @@ GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap",
 #' This preview helps ensure that the output conforms to the expected format, which is crucial for your cleaning function to operate correctly
 #' and for the final generated items to meet your requirements before generating a large number of items via \code{AIGENIE}.
 #'
-#' @param openai.API Optional. A character string containing your OpenAI API key.
-#' @param groq.API Optional. A character string containing your Groq API key.
+#' @param openai.API Optional (Required if using a GPT model). A character string containing your OpenAI API key.
+#' @param groq.API Optional (Required if using a Groq model). A character string containing your Groq API key.
 #' @param user.prompts A named list of custom prompt strings for each item type.
 #' @param N.runs An integer specifying the number of times to run the prompt for preview; defaults to \code{3}.
 #' @param model A character string specifying the language model to use. Options include \code{"gpt3.5"}, \code{"gpt4o"},
@@ -563,7 +568,7 @@ GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap",
 #'   # Replace with your actual OpenAI API key
 #'   key <- "INSERT YOUR KEY HERE"
 #'
-#'   # Define custom prompts for two traits (e.g., "trait1" and "trait2")
+#'   # Define custom prompts for two traits (e.g., "extraversion" and "openness")
 #'   custom_prompts <- list(
 #'     extraversion = "Generate three unique, psychometrically robust items to measure extraversion from the Big Five model of personality. Use the format: <extraversion>: <item statement>.",
 #'     openness = "Generate three unique, psychometrically robust items to measure openness from the Big Five model of personality. Use the format: <openness>: <item statement>."

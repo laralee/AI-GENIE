@@ -7,11 +7,8 @@
 flatten_text(text)
 }
 \arguments{
-\item{text}{A character string or vector to be flattened.}
-}
-\value{
-A character string or vector with text converted to lowercase and punctuation removed.
+\item{text}{A string that should be flattened}
 }
 \description{
-Processes text by converting it to lowercase and removing punctuation.
+Removes the punctuation from a string and converts it to lowercase.
 }
