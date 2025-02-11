@@ -314,7 +314,6 @@ personality.inventory.results.custom <- AIGENIE(
   cleaning.fun = custom_cleaning,
   item.examples = personality.items, # created in example 1
   scale.title = scale.title, # created in example 1,
-  EGA.model = "tmfg",
   custom = TRUE
 )
 

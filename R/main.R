@@ -257,7 +257,6 @@
 #'   cleaning.fun = custom_cleaning,
 #'   item.examples = personality.items, # created in example 1
 #'   scale.title = scale.title, # created in example 1,
-#'   EGA.model = "tmfg",
 #'   custom = TRUE
 #' )
 #'
@@ -506,7 +505,6 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' my.personality.inventory.results <- GENIE(
 #'   items = my.personality.items,
 #'   openai.API = key,
-#'   EGA.model = "tmfg",
 #'   EGA.algorithm = "walktrap"
 #' )
 #'

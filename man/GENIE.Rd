@@ -146,7 +146,6 @@ my.personality.items <- data.frame(statement = c(statements, extraversion_statem
 my.personality.inventory.results <- GENIE(
   items = my.personality.items,
   openai.API = key,
-  EGA.model = "tmfg",
   EGA.algorithm = "walktrap"
 )
 
