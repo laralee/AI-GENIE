@@ -586,28 +586,6 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' # View the final refined item pool
 #' View(my.personality.inventory.results$overall_sample$main_result)
 #'
-#' ##############################################################
-#' ###### Or, Run GENIE with an Open Source Model via Groq ######
-#' ##############################################################
-#'
-#' # Add your API Key from Groq
-#' groq.key <- "INSERT YOUR GROQ API KEY"
-#'
-#' # Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
-#' open.source.model <- "mixtral"
-#'
-#' # Use AIGENIE with an open source model via Groq
-#' my.personality.inventory.results.mixtral <- GENIE(
-#'   items = my.personality.items,
-#'   openai.API = key,
-#'   groq.API = groq.key,
-#'   model = open.source.model
-#'
-#' )
-#'
-#' # View the final item pool
-#' View(my.personality.inventory.results.mixtral$overall_sample$main_result)
-#'
 #' }
 #' @export
 GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap", embedding.model="text-embedding-3-small", plot=TRUE, plot.stability = FALSE, calc.final.stability=FALSE, silently=FALSE, ...) {
@@ -690,7 +668,8 @@ GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap",
 #' # Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
 #' open.source.model <- "mixtral"
 #'
-#'   test_output_open_source <- validate_prompt(
+#' # Generate output using your custom prompt
+#' test_output_open_source <- validate_prompt(
 #'     groq.API = groq.key,
 #'     user.prompts = custom_prompts,
 #'     model = open.source.model,

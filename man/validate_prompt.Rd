@@ -82,7 +82,8 @@ groq.key <- "INSERT YOUR GROQ API KEY"
 # Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
 open.source.model <- "mixtral"
 
-  test_output_open_source <- validate_prompt(
+# Generate output using your custom prompt
+test_output_open_source <- validate_prompt(
     groq.API = groq.key,
     user.prompts = custom_prompts,
     model = open.source.model,

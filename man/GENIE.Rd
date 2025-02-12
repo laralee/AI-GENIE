@@ -202,27 +202,5 @@ my.personality.inventory.results <- GENIE(
 # View the final refined item pool
 View(my.personality.inventory.results$overall_sample$main_result)
 
-##############################################################
-###### Or, Run GENIE with an Open Source Model via Groq ######
-##############################################################
-
-# Add your API Key from Groq
-groq.key <- "INSERT YOUR GROQ API KEY"
-
-# Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
-open.source.model <- "mixtral"
-
-# Use AIGENIE with an open source model via Groq
-my.personality.inventory.results.mixtral <- GENIE(
-  items = my.personality.items,
-  openai.API = key,
-  groq.API = groq.key,
-  model = open.source.model
-
-)
-
-# View the final item pool
-View(my.personality.inventory.results.mixtral$overall_sample$main_result)
-
 }
 }
