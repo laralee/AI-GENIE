@@ -196,11 +196,33 @@ my.personality.items <- data.frame(statement = c(neuroticism_statements, extrave
 # Run GENIE to validate and redundancy-check the item pool
 my.personality.inventory.results <- GENIE(
   items = my.personality.items,
-  openai.API = key,
-  EGA.algorithm = "walktrap"
+  openai.API = key
 )
 
 # View the final refined item pool
-View(my.personality.inventory.results$main_result)
+View(my.personality.inventory.results$overall_sample$main_result)
+
+##############################################################
+###### Or, Run GENIE with an Open Source Model via Groq ######
+##############################################################
+
+# Add your API Key from Groq
+groq.key <- "INSERT YOUR GROQ API KEY"
+
+# Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
+open.source.model <- "mixtral"
+
+# Use AIGENIE with an open source model via Groq
+my.personality.inventory.results.mixtral <- GENIE(
+  items = my.personality.items,
+  openai.API = key,
+  groq.API = groq.key,
+  model = open.source.model
+
+)
+
+# View the final item pool
+View(my.personality.inventory.results.mixtral$overall_sample$main_result)
+
 }
 }

@@ -218,7 +218,7 @@ personality.inventory.results <- AIGENIE(
 )
 
 # View the final item pool
-View(personality.inventory.results$main_result)
+View(personality.inventory.results$overall_result$main_result)
 
 
 #######################################################
@@ -319,7 +319,32 @@ personality.inventory.results.custom <- AIGENIE(
 )
 
 # View the final item pool
-View(personality.inventory.results.custom$main_result)
+View(personality.inventory.results.custom$overall_sample$main_result)
+
+################################################################
+###### Or, Run AIGENIE with an Open Source Model via Groq ######
+################################################################
+
+# Add your API Key from Groq
+groq.key <- "INSERT YOUR GROQ API KEY"
+
+# Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
+open.source.model <- "mixtral"
+
+# Use AIGENIE with an open source model via Groq
+personality.inventory.results.mixtral <- AIGENIE(
+  item.attributes = aspects.of.personality.traits, # created in example 1
+  openai.API = key, # Created in example 1
+  item.examples = personality.items, # Created in example 1
+  sub.domain = sub.domain, # Created in example 1
+  scale.title = scale.title, # Created in example 1
+  model = open.source.model, # Select a model available on Groq's API
+  groq.API = groq.key
+)
+
+# View the final item pool
+View(personality.inventory.results.mixtral$overall_sample$main_result)
+
 }
 
 }
