@@ -629,9 +629,48 @@ get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai
 #'
 #' Displays a summary of the AI-GENIE analysis results, including the EGA model used, embedding type, starting and final number of items, and NMI values before and after reduction. The summary includes the number of iterations for both UVA (Unique Variable Analysis) and bootstrapped EGA steps.
 #'
-#' @param obj A list object containing the analysis results returned by \code{get_results}.
+#' @param obj A list object containing the OVERALL analysis results returned by \code{get_results}.
+#' @param obj2 A list object containing the ITEM-TYPE LEVEL analysis results returned by \code{get_results}.
 #' @return No return value; the function prints the results to the console.
-print_results<-function(obj){
+print_results<-function(obj, obj2){
+
+  # Print the title
+  cat("\n")
+  cat("\n")
+  cat(paste("                           AI-Genie Results"))
+  cat("\n")
+  cat("                           ----------------")
+
+
+  for (i in seq_along(obj2)){
+
+  cat("\n")
+  cat("\n")
+
+  EGA.model <- obj2[[i]][["selected_model"]]
+  before_nmi <- obj2[[i]][["start_nmi"]]
+  embedding_type <- obj2[[i]][["embeddings"]][["embed_type_used"]]
+  after_genie <- obj2[[i]][["nmi"]]
+  initial_items <- obj2[[i]][["start_N"]]
+  final_items <- obj2[[i]][["final_N"]]
+
+
+  words <- strsplit(paste(names(obj2)[[i]], "items"), " ")[[1]]
+  words <- paste0(toupper(substring(words, 1, 1)), substring(words, 2))
+  words <- paste(words, collapse = " ")
+
+  cat(paste("                          ", words))
+  cat("\n")
+  cat(paste("EGA Model:", EGA.model,"    Embeddings Used:", embedding_type,
+            "    Staring N:", initial_items, "    Final N:", final_items))
+  cat("\n")
+  cat(paste0("             Initial NMI: ", round(before_nmi,4) * 100,
+             "           Final NMI: ", round(after_genie,4) * 100))
+  }
+
+  cat("\n")
+  cat("\n")
+
   EGA.model <- obj[["selected_model"]]
   before_nmi <- obj[["start_nmi"]]
   embedding_type <- obj[["embeddings"]][["embed_type_used"]]
@@ -639,20 +678,17 @@ print_results<-function(obj){
   initial_items <- obj[["start_N"]]
   final_items <- obj[["final_N"]]
 
-  cat("\n")
-  cat("\n")
-  cat(paste("                          AI-Genie Results"))
-  cat("\n")
-  cat("                          ----------------")
+  cat(paste("                          Overall Sample Results"))
   cat("\n")
   cat(paste("EGA Model:", EGA.model,"    Embeddings Used:", embedding_type,
             "    Staring N:", initial_items, "    Final N:", final_items))
   cat("\n")
   cat(paste0("             Initial NMI: ", round(before_nmi,4) * 100,
              "           Final NMI: ", round(after_genie,4) * 100))
-  cat("\n")
-  cat("\n")
+
 }
+
+
 
 
 

@@ -479,6 +479,9 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' type <- rep("neuroticism", 16)
 #' attribute <- rep("anxious", 16)
 #'
+#'
+#' ## Neuroticism items (example for the 'anxious' attribute)
+#'
 #' ## Extraversion items (example for the 'assertive' attribute)
 #' extraversion_statements <- c("I am not afraid to speak my mind and assert my opinions in group discussions.",
 #'                              "I have no problem taking the lead in group projects or activities.",

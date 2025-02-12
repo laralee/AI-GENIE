@@ -4,10 +4,12 @@
 \alias{print_results}
 \title{Print Results}
 \usage{
-print_results(obj)
+print_results(obj, obj2)
 }
 \arguments{
-\item{obj}{A list object containing the analysis results returned by \code{get_results}.}
+\item{obj}{A list object containing the OVERALL analysis results returned by \code{get_results}.}
+
+\item{obj2}{A list object containing the ITEM-TYPE LEVEL analysis results returned by \code{get_results}.}
 }
 \value{
 No return value; the function prints the results to the console.

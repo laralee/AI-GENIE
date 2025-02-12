@@ -668,10 +668,6 @@ run_pipeline <- function(items, openai.key,
     plot(complied_results$stability_plot)
   }
 
-  if(!silently){
-  print_results(overall_result)
-  }
-
   # add the appropriate embedding vectors to the item-level results
   for (item.type in names(item_level_results)){
     embedding_list <- list()
@@ -717,6 +713,11 @@ run_pipeline <- function(items, openai.key,
 
     item_level_results[[item.type]][["embeddings"]] <- embedding_list
   }
+
+  if(!silently){
+  print_results(overall_result, item_level_results)
+  }
+
 
   return(list(overall_sample = overall_result,
               item_type_level = item_level_results))
