@@ -66,15 +66,32 @@ and for the final generated items to meet your requirements before generating a 
   test_output <- validate_prompt(
     openai.API = key,
     user.prompts = custom_prompts,
-    N.runs = 3,
-    model = "gpt3.5",
-    top.p = 1,
-    temperature = 1,
-    system.role = system_role,
-    silently = FALSE
+    system.role = system_role
   )
 
   # Print the output to inspect its format
   print(test_output)
+
+########################################################################
+###### Or, Run Validate Prompt with an Open Source Model via Groq ######
+########################################################################
+
+# Add your API Key from Groq
+groq.key <- "INSERT YOUR GROQ API KEY"
+
+# Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
+open.source.model <- "mixtral"
+
+  test_output_open_source <- validate_prompt(
+    groq.API = groq.key,
+    user.prompts = custom_prompts,
+    model = open.source.model,
+    system.role = system_role
+  )
+
+
+# Print the output to inspect its format
+print(test_output_open_source)
+
 }
 }
