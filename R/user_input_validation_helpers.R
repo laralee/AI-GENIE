@@ -890,7 +890,12 @@ validate_item_type_definitions <- function(item.type.definitions, item.types) {
 }
 
 
-
+#' Check the User provided dataframe and then extract the needed columns
+#'
+#' Checks that the provided data frame has the correct columns (type, attribute, and statement)
+#'
+#' @param df A data frame that the user provided containing the type, attribute, and statement
+#' @return A list of the validated item types and attributes
 validate_and_extract_attributes <- function(df) {
 
   # Perform validation checks
@@ -937,6 +942,14 @@ validate_and_extract_attributes <- function(df) {
 }
 
 
+#' Check the User provided API keys
+#'
+#' Checks that the provided at least one valid API string
+#'
+#' @param openai.API A string that the user provided that should correspond to an OpenAI API string
+#' @param groq.API A string that the user provided that should correspond to an Groq API string
+#' @param model A string of the LLM model that user provided to generate items
+#' @return A cleaned list of the API string(s)
 validate_apis <- function(openai.API, groq.API, model){
   if(is.null(openai.API) && is.null(groq.API)){
     stop("Please provide at least one API.")
@@ -969,7 +982,11 @@ validate_apis <- function(openai.API, groq.API, model){
   return(list(openai.API = openai.API, groq.API = groq.API))
 }
 
-
+#' Validate EGA Algorithm
+#'
+#' Checks if the provided EGA input is a string and is one of the accpted EGA algorithms
+#' @param EGA.algorithm The input to be validated.
+#' @return A cleaned version of the EGA algorithm string
 validate_EGA_algorithm <- function(EGA.algorithm){
   if(!is.character(EGA.algorithm)){
     stop("EGA.algorithm must be a valid string. One of 'walktrap', 'louvain', or 'leiden'.")

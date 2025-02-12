@@ -23,6 +23,10 @@ GENIE_checks(
 
 \item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
 
+\item{EGA.algorithm}{A character string specifying the clustering algorithm for EGA (default: \code{"walktrap"}).}
+
+\item{embedding.model}{A string containing the embedding model alias to be used}
+
 \item{plot}{Logical; if \code{TRUE}, displays the network plots.}
 
 \item{silently}{Logical; if \code{TRUE}, suppresses console output.}

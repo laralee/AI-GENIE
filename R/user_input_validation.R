@@ -22,6 +22,7 @@
 #' @param items.only Logical; if \code{TRUE}, only items are generated without further analysis.
 #' @param adaptive Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items.
 #' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.algorithm A character string specifying the clustering algorithm for EGA (default: \code{"walktrap"}).
 #' @param embedding.model A character string specifying the OpenAI embedding model that should be used. The options are `"text-embedding-3-small"`, `"text-embedding-3-large"`, or `"text-embedding-ada-002"`. Defaults to `"text-embedding-3-small"`.
 #' @param keep.org Logical; if \code{TRUE}, includes the original items in the returned results.
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
@@ -154,6 +155,8 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #' @param item.data A required data frame containing your item statements and item type labels.
 #' @param openai.API A required character string of your OpenAI API key.
 #' @param EGA.model An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).
+#' @param EGA.algorithm A character string specifying the clustering algorithm for EGA (default: \code{"walktrap"}).
+#' @param embedding.model A string containing the embedding model alias to be used
 #' @param plot Logical; if \code{TRUE}, displays the network plots.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
 #' @return A list containing:
@@ -289,7 +292,22 @@ validate_return_object <- function(output, n_empty, item_attributes) {
 }
 
 
-
+#' GENIE Input Validation
+#'
+#' Validates and processes the input parameters for the \code{custom_prompt} function. This function ensures that the provided item data is correctly formatted, contains no missing or duplicate values, and meets the requirements.
+#'
+#' @param openai.API Optional (Required if using a GPT model). A character string containing your OpenAI API key.
+#' @param groq.API Optional (Required if using a Groq model). A character string containing your Groq API key.
+#' @param user.prompts A named list of custom prompt strings for each item type.
+#' @param N.runs An integer specifying the number of times to run the prompt for preview; defaults to \code{3}.
+#' @param model A character string specifying the language model to use. Options include \code{"gpt3.5"}, \code{"gpt4o"},
+#'              \code{"llama3"}, \code{"mixtral"}, \code{"deepseek"}, or \code{"gemma2"}. Defaults to \code{"gpt3.5"}.
+#' @param top.p Numeric; defaults to \code{1}. Sets the top-p sampling parameter for the language model.
+#' @param temperature Numeric; defaults to \code{1}. Controls the randomness of the model's output (valid range: 0–2).
+#' @param system.role Optional. A character string defining the role of the language model (e.g., "an expert methodologist").
+#' @param silently Logical; defaults to \code{FALSE}. If \code{TRUE}, suppresses console output.
+#'
+#' @return A named list containing all of the cleaned and validated user parameters
 validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, model,
                                   top.p, temperature, system.role, silently) {
   # check that there are no NAs

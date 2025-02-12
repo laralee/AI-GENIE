@@ -70,6 +70,8 @@ AIGENIE_checks(
 
 \item{EGA.model}{An optional character string specifying the EGA model to use (\code{"tmfg"} or \code{"glasso"}).}
 
+\item{EGA.algorithm}{A character string specifying the clustering algorithm for EGA (default: \code{"walktrap"}).}
+
 \item{embedding.model}{A character string specifying the OpenAI embedding model that should be used. The options are \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}. Defaults to \code{"text-embedding-3-small"}.}
 
 \item{keep.org}{Logical; if \code{TRUE}, includes the original items in the returned results.}
