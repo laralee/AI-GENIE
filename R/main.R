@@ -459,28 +459,47 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' ## Create a data frame of items to reduce - for this example, we will focus only on Neuroticism and Extraversion
 #'
 #' ## Neuroticism items (example for the 'anxious' attribute)
-#' statements <- c("I often worry about things that may never happen.",
-#'                 "The thought of uncertainty makes me feel uneasy.",
-#'                 "I often feel on edge and apprehensive about the future.",
-#'                 "I tend to overthink and dwell on negative possibilities.",
-#'                 "I often find myself anticipating the worst possible outcome.",
-#'                 "I frequently feel a sense of dread without any specific reason.",
-#'                 "I often feel a sense of impending doom for no reason.",
-#'                 "I frequently have irrational fears that something bad will happen.",
-#'                 "I frequently worry about things that may never happen.",
-#'                 "I often feel a tightness in my chest when faced with uncertainty.",
-#'                 "I frequently worry about possible negative outcomes in everyday situations.",
-#'                 "I frequently feel a sense of impending doom for no reason.",
-#'                 "I frequently feel a knot in my stomach over minor uncertainties.",
-#'                 "I am constantly on edge, waiting for something terrible to happen.",
-#'                 "I constantly feel a sense of unease and worry, even in everyday situations.",
-#'                 "I often feel panicky and overwhelmed by minor stressors.")
+#' neuroticism_statements <- c("I often worry about things that may never happen.",
+#'                             "The thought of uncertainty makes me feel uneasy.",
+#'                             "I often feel on edge and apprehensive about the future.",
+#'                             "I tend to overthink and dwell on negative possibilities.",
+#'                             "I often find myself anticipating the worst possible outcome.",
+#'                             "I frequently feel a sense of dread without any specific reason.",
+#'                             "I often feel a sense of impending doom for no reason.",
+#'                             "I frequently have irrational fears that something bad will happen.",
+#'                             "I frequently worry about things that may never happen.",
+#'                             "I often feel a tightness in my chest when faced with uncertainty.",
+#'                             "I frequently worry about possible negative outcomes in everyday situations.",
+#'                             "I frequently feel a sense of impending doom for no reason.",
+#'                             "I frequently feel a knot in my stomach over minor uncertainties.",
+#'                             "I am constantly on edge, waiting for something terrible to happen.",
+#'                             "I constantly feel a sense of unease and worry, even in everyday situations.",
+#'                             "I often feel panicky and overwhelmed by minor stressors.")
 #'
 #' type <- rep("neuroticism", 16)
 #' attribute <- rep("anxious", 16)
 #'
+#' ## Neuroticism items (example for the 'emotional' attribute)
+#' neuroticism_statements <- c(neuroticism_statements,
+#'                             "I am easily overwhelmed by intense feelings of sadness.",
+#'                             "I find myself getting emotional over small, everyday occurrences.",
+#'                             "I am easily moved to tears by even small gestures of kindness.",
+#'                             "I experience extreme highs and lows in my emotional state.",
+#'                             "My emotions can sometimes feel overwhelming and difficult to control.",
+#'                             "My feelings tend to be intense and overwhelming, often difficult to manage.",
+#'                             "It is common for me to feel tense and easily startled.",
+#'                             "I frequently find myself getting choked up over sentimental moments.",
+#'                             "I am easily moved to tears by small acts of kindness.",
+#'                             "My feelings are often intense and difficult to control.",
+#'                             "I am easily moved to tears by movies or sad stories.",
+#'                             "My feelings often overwhelm me, making it hard to cope at times.",
+#'                             "My emotions tend to be intense and difficult to regulate.",
+#'                             "I am easily moved to tears by touching moments in movies or books.",
+#'                             "I find it challenging to control how I respond to my feelings.",
+#'                             "It's difficult for me to recognize when I overreact.")
 #'
-#' ## Neuroticism items (example for the 'anxious' attribute)
+#' type <- c(type, rep("neuroticism", 16))
+#' attribute <- c(attribute, rep("emotional", 16))
 #'
 #' ## Extraversion items (example for the 'assertive' attribute)
 #' extraversion_statements <- c("I am not afraid to speak my mind and assert my opinions in group discussions.",
@@ -503,8 +522,32 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
 #' type <- c(type, rep("extraversion", 16))
 #' attribute <- c(attribute, rep("assertive", 16))
 #'
+#'
+#' ## Extraversion items (example for the 'energetic' attribute)
+#' extraversion_statements <- c(extraversion_statements,
+#'                              "Approaching each day with enthusiasm and vigor is my standard mode of operation.",
+#'                              "My dynamic energy and lively nature bring excitement to every interaction.",
+#'                              "Approaching each day with high levels of enthusiasm and energy is simply part of who I am.",
+#'                              "My vibrant energy is infectious and lights up any room I enter.",
+#'                              "I always am ready to dive into new adventures.",
+#'                              "Approaching each day with exuberance is just who I am.",
+#'                              "My energetic and lively spirit is infectious.",
+#'                              "I have an infectious lively spirit that energizes those around me.",
+#'                              "I best thrive in lively environments.",
+#'                              "Approaching each day with exuberance is my norm.",
+#'                              "I have an abundance of energy that fuels my actions throughout the day.",
+#'                              "I enjoy conversations that are upbeat and spry.",
+#'                              "I am usually the most energetic person in the room.",
+#'                              "I absolutely love it when there is excitement in the air.",
+#'                              "My energy is contagious and lights up the room.",
+#'                              "My lively nature brings a dynamic energy to any situation.")
+#'
+#' type <- c(type, rep("extraversion", 16))
+#' attribute <- c(attribute, rep("energetic", 16))
+#'
+#'
 #' # Combine into a data frame
-#' my.personality.items <- data.frame(statement = c(statements, extraversion_statements),
+#' my.personality.items <- data.frame(statement = c(neuroticism_statements, extraversion_statements),
 #'                                    type = type,
 #'                                    attribute = attribute,
 #'                                    stringsAsFactors = FALSE)
