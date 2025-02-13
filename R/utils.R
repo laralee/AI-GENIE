@@ -79,7 +79,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
   }
 
   # Determine which model to use
-  if (grepl("gpt", model)) {
+  if (grepl("gpt", model) || grepl("o1", model) || grepl("o3", model)) {
     openai <- reticulate::import("openai")
     openai$api_key <- openai.API
     generate_FUN <- openai$ChatCompletion$create
