@@ -813,7 +813,7 @@ generate_output <- function(openai.API, groq.API,
   )
 
   # Determine which API to use
-  if (grepl("gpt", model)) {
+  if (grepl("gpt", model) || grepl("o3", model) || grepl("o1", model)) {
     openai <- reticulate::import("openai")
     openai$api_key <- openai.API
     generate_FUN <- openai$ChatCompletion$create
