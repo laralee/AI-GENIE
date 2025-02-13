@@ -331,7 +331,7 @@ validate_api_keys <- function(openai.API, groq.API, model) {
       stop("'groq.API' must be a string.")
     }
     groq.API <- trimws(groq.API)
-  } else if (!grepl("gpt", model, ignore.case = TRUE) | !grepl("o3", model, ignore.case = TRUE) | !grepl("o1", model, ignore.case = TRUE)) {
+  } else if (!grepl("gpt", model, ignore.case = TRUE) && !grepl("o3", model, ignore.case = TRUE) && !grepl("o1", model, ignore.case = TRUE)) {
     stop("A Groq API key is required if using an open-source model. Either specify a 'groq.API' key or use a GPT model.")
   }
 
