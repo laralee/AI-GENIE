@@ -91,6 +91,27 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     max_tokens_set <- 7000L
   }
 
+  # For o1 and o3 models, use 'max_completion_tokens' and set it to 20000.
+  if (grepl("o1", model) || grepl("o3", model)) {
+    completion_param <- "max_completion_tokens"
+    completion_value <- 20000L
+  } else {
+    completion_param <- "max_tokens"
+    completion_value <- max_tokens_set
+  }
+
+  # Helper function to call the API using the correct parameter
+  call_generate_FUN <- function(messages_list) {
+    call_params <- list(
+      model = model,
+      messages = messages_list,
+      temperature = temperature,
+      top_p = top.p
+    )
+    call_params[[completion_param]] <- completion_value
+    do.call(generate_FUN, call_params)
+  }
+
   items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
 
   if (!custom) {
@@ -168,15 +189,9 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
               stop()
             }
 
-            # API Call with Timeout
+            # API Call with Timeout using the helper function
             R.utils::withTimeout({
-              response <- generate_FUN(
-                model = model,
-                messages = messages_list,
-                temperature = temperature,
-                max_tokens = max_tokens_set,
-                top_p = top.p
-              )
+              response <- call_generate_FUN(messages_list)
             }, timeout = 20, onTimeout = "error")
             response
           },
@@ -254,13 +269,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
                 list("role" = "user", "content" = constructed_content)
               )
               R.utils::withTimeout({
-                response <- generate_FUN(
-                  model = model,
-                  messages = messages_list,
-                  temperature = temperature,
-                  max_tokens = max_tokens_set,
-                  top_p = top.p
-                )
+                response <- call_generate_FUN(messages_list)
               }, timeout = 20, onTimeout = "error")
               response
             }, error = function(e) {
@@ -830,13 +839,22 @@ generate_output <- function(openai.API, groq.API,
     system.role <- "You are an expert psychometrician and test developer. Your task is to create high-quality, psychometrically robust items."
   }
 
+  # Determine which token parameter to use
+  if (grepl("o1", model) || grepl("o3", model)) {
+    token_param <- "max_completion_tokens"
+    token_value <- 20000L
+  } else {
+    token_param <- "max_tokens"
+    token_value <- max_tokens_set
+  }
+
   item.types <- names(user.prompts)
   responses <- list()
 
   for (i in seq_along(item.types)) {
     current_label <- item.types[[i]]
 
-    # Print "Generating items for..." message
+    # Print "Generating responses for..." message
     if (!silently) {
       cat(paste("Generating responses for", current_label, "... "))
     }
@@ -846,21 +864,25 @@ generate_output <- function(openai.API, groq.API,
       list("role" = "user", "content" = user.prompts[[current_label]])
     )
 
+    # Initialize the list for current_label
+    responses[[current_label]] <- list()
+
     for (j in 1:N.runs) {
       retry_count <- 0
       success <- FALSE
 
       while (!success && retry_count < 10) {  # Retry up to 10 times
-        result <- tryCatch({
-          # API Call with Timeout
+        tryCatch({
+          # API Call with Timeout using the appropriate token parameter
           R.utils::withTimeout({
-            response <- generate_FUN(
+            params <- list(
               model = model,
               messages = messages_list,
               temperature = temperature,
-              max_tokens = max_tokens_set,
               top_p = top.p
             )
+            params[[token_param]] <- token_value
+            response <- do.call(generate_FUN, params)
           }, timeout = 20, onTimeout = "error")
 
           # Store response and break loop on success
@@ -891,4 +913,5 @@ generate_output <- function(openai.API, groq.API,
 
   return(responses)
 }
+
 
