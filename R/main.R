@@ -272,7 +272,7 @@
 #' groq.key <- "INSERT YOUR GROQ API KEY"
 #'
 #' # Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
-#' open.source.model <- "mixtral"
+#' open.source.model <- "Gemma 2"
 #'
 #' # Use AIGENIE with an open source model via Groq
 #' personality.inventory.results.mixtral <- AIGENIE(
@@ -666,7 +666,7 @@ GENIE <- function(items, openai.API, EGA.model=NULL, EGA.algorithm = "walktrap",
 #' groq.key <- "INSERT YOUR GROQ API KEY"
 #'
 #' # Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
-#' open.source.model <- "mixtral"
+#' open.source.model <- "Gemma 2"
 #'
 #' # Generate output using your custom prompt
 #' test_output_open_source <- validate_prompt(

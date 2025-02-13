@@ -329,7 +329,7 @@ View(personality.inventory.results.custom$overall_sample$main_result)
 groq.key <- "INSERT YOUR GROQ API KEY"
 
 # Chose between 'Mixtral', 'Gemma 2', 'Llama 3', or 'DeepSeek'
-open.source.model <- "mixtral"
+open.source.model <- "Gemma 2"
 
 # Use AIGENIE with an open source model via Groq
 personality.inventory.results.mixtral <- AIGENIE(

@@ -286,9 +286,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             cleaning_attempt <- cleaning_attempt + 1
             if (cleaning_attempt > max_cleaning_attempts) {
               stop(cleaning_result$error)
-            } else {
-              warning(sprintf("Custom cleaning function failed on attempt %d of %d: %s. Retrying API call...",
-                              cleaning_attempt - 1, max_cleaning_attempts, cleaning_result$error$message))
             }
           }
         }
