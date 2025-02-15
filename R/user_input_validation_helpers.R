@@ -1001,3 +1001,429 @@ validate_EGA_algorithm <- function(EGA.algorithm){
   }
   return(EGA.algorithm)
 }
+
+
+
+# p-AIGENIE Helpers ----
+
+#' Validate and Normalize Difficulty Levels
+#'
+#' Validates the provided `difficulty_level` parameter and returns a normalized named list of lists.
+#' The function accepts difficulty specifications either as a vector or as a named list. If a vector is provided,
+#' it is applied to all subcategories from `item_attributes`. If a named list is provided, each entry is validated
+#' after trimming whitespace and converting to lowercase; the function then returns the difficulties in uppercase.
+#' It also checks for duplicate values, unambiguous naming, and conflicts between category-level and subcategory-level
+#' difficulty specifications.
+#'
+#' @param difficulty_level Either a named list of difficulty vectors or a vector of difficulties.
+#'        Allowed difficulty values (case insensitive) are: "very low", "low", "medium", "high", "very high".
+#' @param item_attributes A named list where each name corresponds to an item category and each element is a vector of subcategory names.
+#'
+#' @return A normalized named list of lists, where each top-level name is an item category and each subcategory maps to a vector
+#'         of difficulty levels in uppercase.
+validate_difficulty_level <- function(difficulty_level, item_attributes) {
+
+  # Allowed difficulty values (in lower case for validation).
+  allowed_difficulties <- c("very low", "low", "medium", "high", "very high")
+
+  # Helper function: validate and normalize a single difficulty vector.
+  validate_difficulty_vector <- function(vec) {
+    if (!is.character(vec)) {
+      stop("All difficulty levels must be provided as strings.")
+    }
+    # Trim whitespace and convert to lower case.
+    vec <- tolower(trimws(vec))
+
+    if (any(!vec %in% allowed_difficulties)) {
+      stop(paste0("Invalid difficulty levels found. Allowed values: ",
+                  paste(allowed_difficulties, collapse = ", "), "."))
+    }
+    if (length(vec) != length(unique(vec))) {
+      stop("Duplicate difficulty levels within a vector are not allowed.")
+    }
+    # Return the vector in uppercase.
+    return(toupper(vec))
+  }
+
+  # The result will be a named list of lists:
+  # result[[category]][[subcategory]] = vector of difficulties.
+  result <- list()
+
+  # Process if difficulty_level is provided as a list.
+  if (is.list(difficulty_level)) {
+    # Ensure that all elements have names.
+    names_dl <- names(difficulty_level)
+    if (is.null(names_dl) || any(names_dl == "")) {
+      stop("When provided as a list, every element of difficulty_level must be named.")
+    }
+    # Check for duplicate names.
+    if (length(unique(names_dl)) != length(names_dl)) {
+      stop("Duplicate names in difficulty_level are not allowed.")
+    }
+
+    # Validate each provided vector.
+    for (nm in names_dl) {
+      difficulty_level[[nm]] <- validate_difficulty_vector(difficulty_level[[nm]])
+    }
+
+    # For each provided name, if it is not a category, it must be an unambiguous subcategory.
+    for (nm in names_dl) {
+      if (!(nm %in% names(item_attributes))) {
+        # Count how many times this name appears as a subcategory.
+        count <- 0
+        for (cat in names(item_attributes)) {
+          if (nm %in% item_attributes[[cat]]) {
+            count <- count + 1
+          }
+        }
+        if (count == 0) {
+          stop(paste0("Key '", nm, "' in difficulty_level does not match any category or subcategory in item_attributes."))
+        } else if (count > 1) {
+          stop(paste0("Key '", nm, "' in difficulty_level is ambiguous; it appears in more than one category in item_attributes."))
+        }
+      }
+    }
+
+    # Check for conflicts: a subcategory should not be specified both explicitly and via its category.
+    for (cat in names(item_attributes)) {
+      if (cat %in% names_dl) {
+        for (subcat in item_attributes[[cat]]) {
+          if (subcat %in% names_dl) {
+            stop(paste0("Conflict: subcategory '", subcat, "' in category '", cat,
+                        "' is specified both implicitly via its category and explicitly."))
+          }
+        }
+      }
+    }
+
+    # Build the normalized result structure.
+    for (cat in names(item_attributes)) {
+      result[[cat]] <- list()
+      for (subcat in item_attributes[[cat]]) {
+        if (subcat %in% names_dl) {
+          # Use the explicit mapping for the subcategory.
+          result[[cat]][[subcat]] <- difficulty_level[[subcat]]
+        } else if (cat %in% names_dl) {
+          # Use the category-level mapping.
+          result[[cat]][[subcat]] <- difficulty_level[[cat]]
+        } else {
+          # Use default difficulties (converted to uppercase).
+          result[[cat]][[subcat]] <- toupper(c("low", "medium", "high"))
+        }
+      }
+    }
+
+  } else if (is.vector(difficulty_level)) {
+    # When provided as a vector, validate it and assign globally.
+    difficulty_level <- validate_difficulty_vector(difficulty_level)
+
+    # Apply the same vector for every subcategory.
+    for (cat in names(item_attributes)) {
+      result[[cat]] <- list()
+      for (subcat in item_attributes[[cat]]) {
+        result[[cat]][[subcat]] <- difficulty_level
+      }
+    }
+
+  } else {
+    stop("difficulty_level must be either a named list or a vector.")
+  }
+
+  return(result)
+}
+
+#' Validate Item Attributes for p_AIGENIE
+#'
+#' Validates the provided `item.attributes` parameter for use with p_AIGENIE. This function ensures that:
+#' 1. `item.attributes` is a named list.
+#' 2. Each element in the list is a character vector representing attributes.
+#' 3. Each attribute vector contains at least two elements.
+#' 4. There are no duplicate elements within any attribute vector.
+#'
+#' @param item_attributes A named list where each name corresponds to an item type and each element is a character vector of attributes.
+#'
+#' @return The validated `item.attributes` list.
+validate_item_attributes_p <- function(item_attributes) {
+  if (!is.list(item_attributes)) {
+    stop("item_attributes must be a list.")
+  }
+
+  # Check that the list is named.
+  names_attr <- names(item_attributes)
+  if (is.null(names_attr) || any(names_attr == "")) {
+    stop("All elements of item_attributes must be named.")
+  }
+
+  # Validate each category.
+  for (cat in names(item_attributes)) {
+    attrs <- item_attributes[[cat]]
+
+    if (!is.character(attrs)) {
+      stop(paste0("All attributes for category '", cat, "' must be character strings."))
+    }
+
+    if (length(attrs) < 2) {
+      stop(paste0("Category '", cat, "' must have at least two attributes."))
+    }
+
+    if (length(unique(attrs)) != length(attrs)) {
+      stop(paste0("Duplicate attributes found in category '", cat, "'."))
+    }
+  }
+
+  return(item_attributes)
+}
+
+
+#' Validate Item Examples (Performance Scale Version)
+#'
+#' Validates the provided `item.examples` data frame for performance-based scale items.
+#' This function now requires a fifth column, `difficulty`, which indicates the difficulty
+#' of the example item. It performs the following checks:
+#' 1. `item.examples` is a data frame containing the required columns:
+#'    `type`, `attribute`, `item`, `answer`, and `difficulty`.
+#' 2. All required columns contain only strings (converting factors to character if needed).
+#' 3. There are no missing or empty values in any required column.
+#' 4. The `type` values must be among the names of `item.attributes`.
+#' 5. The `attribute` values must be valid for the given `type` as defined in `item.attributes`.
+#' 6. The `difficulty` column is cleaned (trimmed, lower-cased) and validated to be one of
+#'    "very low", "low", "medium", "high", or "very high". The column is then stored in uppercase.
+#' 7. Duplicate rows are removed.
+#' 8. For each combination of `type`, `attribute`, and each expected difficulty (provided by
+#'    `expected_difficulty_levels`), the function checks:
+#'      - If there are no examples, a message is printed.
+#'      - If there are more than 10 examples, a message is printed.
+#'
+#' @param item.examples A data frame containing columns: `type`, `attribute`, `item`, `answer`, and `difficulty`.
+#' @param item_attributes A named list where each name corresponds to an item type and each element is a character vector of attributes.
+#' @param expected_difficulty_levels A nested list (with the same structure as the validated difficulty_level parameter)
+#'        where for each type and attribute, the expected difficulties (in uppercase) are provided.
+#' @param silently A logical flag. If TRUE, the function will suppress messages regarding the example counts.
+#'
+#' @return A validated and deduplicated version of the `item.examples` data frame with the `difficulty` column normalized to uppercase.
+validate_item_examples_p <- function(item.examples, item_attributes, expected_difficulty_levels, silently = FALSE) {
+
+  # Define the required columns, now including 'difficulty'.
+  required_cols <- c("type", "attribute", "item", "answer", "difficulty")
+
+  # Check that item.examples is a data frame.
+  if (!is.data.frame(item.examples)) {
+    stop("item.examples must be a data frame.")
+  }
+
+  # Check that all required columns are present.
+  missing_cols <- setdiff(required_cols, colnames(item.examples))
+  if (length(missing_cols) > 0) {
+    stop(paste("The following required columns are missing from item.examples:",
+               paste(missing_cols, collapse = ", ")))
+  }
+
+  # Ensure that each required column contains only strings.
+  for (col in required_cols) {
+    # Convert factors to character if necessary.
+    if (is.factor(item.examples[[col]])) {
+      item.examples[[col]] <- as.character(item.examples[[col]])
+    } else if (!is.character(item.examples[[col]])) {
+      stop(paste("Column", col, "must contain strings."))
+    }
+  }
+
+  # Check for missing or empty values in required columns.
+  if (any(is.na(item.examples[, required_cols]) | item.examples[, required_cols] == "")) {
+    stop("item.examples contains missing or empty values in one or more required columns.")
+  }
+
+  # Validate that each 'type' is in the names of item_attributes.
+  invalid_types <- unique(item.examples$type[!item.examples$type %in% names(item_attributes)])
+  if (length(invalid_types) > 0) {
+    stop(paste("The following types in item.examples are not valid based on item.attributes:",
+               paste(invalid_types, collapse = ", ")))
+  }
+
+  # Validate that each 'attribute' is valid for its corresponding 'type'.
+  invalid_attr_idx <- which(!mapply(function(tp, att) {
+    att %in% item_attributes[[tp]]
+  }, item.examples$type, item.examples$attribute))
+
+  if (length(invalid_attr_idx) > 0) {
+    invalid_entries <- unique(paste("type:", item.examples$type[invalid_attr_idx],
+                                    "attribute:", item.examples$attribute[invalid_attr_idx]))
+    stop(paste("The following type-attribute combinations in item.examples are invalid:",
+               paste(invalid_entries, collapse = "; ")))
+  }
+
+  # Validate the 'difficulty' column.
+  allowed_difficulties <- c("very low", "low", "medium", "high", "very high")
+  # Clean the difficulty column: trim whitespace and convert to lower case.
+  difficulties_clean <- trimws(tolower(item.examples$difficulty))
+
+  if (any(!difficulties_clean %in% allowed_difficulties)) {
+    stop(paste("Invalid difficulty levels found in item.examples. Allowed values are:",
+               paste(allowed_difficulties, collapse = ", ")))
+  }
+
+  # Update the difficulty column to be in uppercase.
+  item.examples$difficulty <- toupper(difficulties_clean)
+
+  # Remove duplicate rows.
+  item.examples <- unique(item.examples)
+
+  # Check for example counts per type, attribute, and expected difficulty.
+  missing_examples <- c()
+  too_many_examples <- c()
+
+  # Loop over each item type and attribute as defined in item_attributes.
+  for (cat in names(item_attributes)) {
+    for (att in item_attributes[[cat]]) {
+      # Only check if expected difficulties are provided for this combination.
+      if (!is.null(expected_difficulty_levels[[cat]][[att]])) {
+        for (diff in expected_difficulty_levels[[cat]][[att]]) {
+          diff_upper <- toupper(diff)
+          count <- sum(item.examples$type == cat &
+                         item.examples$attribute == att &
+                         item.examples$difficulty == diff_upper)
+          if (count == 0) {
+            missing_examples <- c(missing_examples, paste0(cat, " -> ", att, " -> ", diff_upper))
+          } else if (count > 10) {
+            too_many_examples <- c(too_many_examples, paste0(cat, " -> ", att, " -> ", diff_upper))
+          }
+        }
+      }
+    }
+  }
+
+  # Print informative messages unless the silently flag is set.
+  if (!silently) {
+    if (length(missing_examples) > 0) {
+      message("For best results, provide at least one sample item per each item attribute and difficulty combination. ",
+              "These combinations do not have any examples: ", paste(missing_examples, collapse = ", "))
+    }
+    if (length(too_many_examples) > 0) {
+      message("These combinations have more than 10 examples: ",
+              paste(too_many_examples, collapse = ", "),
+              ". Ensure you are using a model with a large context window.")
+    }
+  }
+
+  return(item.examples)
+}
+
+
+#' Validate target.N Parameter for Performance AI-GENIE
+#'
+#' Validates the `target.N` parameter, which specifies the number of items to generate.
+#' This parameter can be provided either as a single numeric value or as a nested list
+#' that mirrors the structure of the prompts. When provided as a nested list, the structure
+#' must align with the expected keys from `item_attributes` (outer keys and attributes) and
+#' `difficulty_level` (innermost keys corresponding to difficulty levels, in uppercase).
+#'
+#' Requirements:
+#' \enumerate{
+#'   \item If a single numeric value is provided, it must be a whole number greater than 15.
+#'   \item If a nested list is provided:
+#'     \enumerate{
+#'       \item Each outer key must be one of the names in `item_attributes`.
+#'       \item Each inner key (attribute) must be found within the corresponding `item_attributes` sublist.
+#'       \item Each innermost key (difficulty) must match (after converting to uppercase) one of the
+#'             expected difficulty values for that category and attribute from `difficulty_level`.
+#'       \item All numeric values must be whole numbers and greater than 15.
+#'     }
+#' }
+#'
+#' @param target.N Either a single numeric value or a nested list of numeric values.
+#' @param item_attributes A named list where each name corresponds to an item type and each element is a character vector of attributes.
+#' @param difficulty_level A nested list (with the same keys as `item_attributes`) where each attribute maps to a vector of expected difficulty levels (in uppercase).
+#'
+#' @return The validated `target.N` parameter (if valid, it is returned unchanged; if a single number, it is returned as an integer).
+validate_target_N_p <- function(target.N, item_attributes, difficulty_level) {
+
+  # Helper function: checks if x is a whole number.
+  is_whole_number <- function(x) {
+    is.numeric(x) && (x %% 1 == 0)
+  }
+
+  # Case 1: target.N is a single numeric value.
+  if (is.numeric(target.N) && length(target.N) == 1) {
+    if (!is_whole_number(target.N)) {
+      stop("target.N must be a whole number.")
+    }
+    if (target.N <= 15) {
+      stop("target.N must be greater than 15.")
+    }
+    # Build a nested list structure using item_attributes and difficulty_level.
+    nested_target <- list()
+    for (cat in names(item_attributes)) {
+      nested_target[[cat]] <- list()
+      for (att in item_attributes[[cat]]) {
+        expected_diffs <- difficulty_level[[cat]][[att]]
+        if (is.null(expected_diffs)) {
+          stop(paste0("No expected difficulty levels found for category '", cat, "', attribute '", att, "'."))
+        }
+        nested_target[[cat]][[att]] <- list()
+        for (diff in expected_diffs) {
+          nested_target[[cat]][[att]][[diff]] <- as.integer(target.N)
+        }
+      }
+    }
+    return(nested_target)
+  }
+
+  # Case 2: target.N is a list.
+  else if (is.list(target.N)) {
+    # Verify that item_attributes and difficulty_level are provided.
+    if (is.null(item_attributes) || is.null(difficulty_level)) {
+      stop("When target.N is provided as a list, both item_attributes and difficulty_level must be provided.")
+    }
+
+    # Validate outer keys.
+    for (cat in names(target.N)) {
+      if (!(cat %in% names(item_attributes))) {
+        stop(paste0("Invalid category '", cat, "' found in target.N. It is not present in item_attributes."))
+      }
+      inner <- target.N[[cat]]
+      if (!is.list(inner)) {
+        stop(paste0("For category '", cat, "', target.N must be a list mapping attributes to difficulty targets."))
+      }
+      # Validate inner keys (attributes)
+      for (att in names(inner)) {
+        if (!(att %in% item_attributes[[cat]])) {
+          stop(paste0("Invalid attribute '", att, "' for category '", cat, "' in target.N. It is not present in item_attributes for that category."))
+        }
+        expected_diffs <- difficulty_level[[cat]][[att]]
+        if (is.null(expected_diffs)) {
+          stop(paste0("No expected difficulty levels found for category '", cat, "', attribute '", att, "'."))
+        }
+        innermost <- inner[[att]]
+        if (!is.list(innermost)) {
+          stop(paste0("For category '", cat, "', attribute '", att, "', target.N must be a list mapping difficulty levels to target numbers."))
+        }
+        for (diff in names(innermost)) {
+          diff_upper <- toupper(diff)
+          if (!(diff_upper %in% expected_diffs)) {
+            stop(paste0("Invalid difficulty '", diff, "' for category '", cat, "', attribute '", att,
+                        "' in target.N. Expected one of: ", paste(expected_diffs, collapse = ", ")))
+          }
+          value <- innermost[[diff]]
+          if (!is.numeric(value) || length(value) != 1) {
+            stop(paste0("The target.N value for category '", cat, "', attribute '", att, "', difficulty '", diff,
+                        "' must be a single numeric value."))
+          }
+          if (!is_whole_number(value)) {
+            stop(paste0("The target.N value for category '", cat, "', attribute '", att, "', difficulty '", diff,
+                        "' must be a whole number."))
+          }
+          if (value <= 15) {
+            stop(paste0("The target.N value for category '", cat, "', attribute '", att, "', difficulty '", diff,
+                        "' must be greater than 15."))
+          }
+        }
+      }
+    }
+    return(target.N)
+  }
+
+  else {
+    stop("target.N must be either a single numeric value or a nested list of numeric values.")
+  }
+}
+

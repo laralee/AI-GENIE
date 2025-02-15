@@ -706,6 +706,80 @@ validate_prompt <- function(openai.API=NULL, groq.API = NULL,
 }
 
 
+#' @export
+#' p_AIGENIE: Generate Performance-Based Items
+#'
+#' This function validates parameters, builds prompts, calls the language model API to generate
+#' candidate items, cleans the output, and returns a data frame of generated items. The returned
+#' data frame includes the columns: \code{type}, \code{statement}, \code{answer}, and \code{difficulty}.
+#'
+#' @param item_attributes A named list of item types, where each element is a character vector of attributes.
+#' @param difficulty_level Either a named list of difficulty vectors or a vector of difficulties.
+#' @param item.examples A data frame with columns: \code{type}, \code{attribute}, \code{item}, \code{answer}, and \code{difficulty}.
+#' @param scale.title A string representing the title of the scale, or \code{NULL}.
+#' @param audience A string representing the intended audience, or \code{NULL}.
+#' @param subject A string representing the subject, or \code{NULL}.
+#' @param silently Logical; if \code{TRUE}, progress messages are suppressed.
+#' @param model A character string specifying the LLM model to use (e.g., "gpt3.5", "llama3").
+#' @param groq.API An optional string with the Groq API key (if applicable).
+#' @param openai.API A required string with the OpenAI API key.
+#' @param temperature Numeric; the model's temperature (range: 0–2).
+#' @param top.p Numeric; the model's top-p sampling parameter (range: 0–1).
+#' @param system.role A string describing the system role for the LLM, or \code{NULL}.
+#' @param target.N Either a single integer or a nested list specifying the number of items to generate per group.
+#' @param adaptive Logical; if \code{TRUE}, adaptive prompting is used.
+#'
+#' @return A data frame with columns: \code{type}, \code{statement}, \code{answer}, and \code{difficulty}.
+#'
+p_AIGENIE <- function(item_attributes, difficulty_level, item.examples,
+                      scale.title = NULL, audience = NULL, subject = NULL, silently = FALSE,
+                      model, groq.API, openai.API,
+                      temperature=1, top.p=1, system.role = NULL, target.N=30, adaptive=TRUE) {
 
+  # Validate all parameters.
+  validated_params <- validate_p_AIGENIE_parameters(
+    item_attributes   = item_attributes,
+    difficulty_level  = difficulty_level,
+    item.examples     = item.examples,
+    scale.title       = scale.title,
+    audience          = audience,
+    subject           = subject,
+    silently          = silently,
+    model             = model,
+    groq.API          = groq.API,
+    openai.API        = openai.API,
+    temperature       = temperature,
+    top.p             = top.p,
+    system.role       = system.role,
+    target.N          = target.N,
+    adaptive          = adaptive
+  )
 
+  # Build nested prompts using validated parameters.
+  prompts <- build_prompts(
+    scale.title      = validated_params$scale.title,
+    subject          = validated_params$subject,
+    audience         = validated_params$audience,
+    item_attributes  = validated_params$item.attributes,
+    difficulty_level = validated_params$difficulty_level,
+    item.examples    = validated_params$item.examples
+  )
 
+  # Generate items using the internal generation function.
+  items_df <- generate.items.internal.p(
+    prompts      = prompts,
+    target.N     = validated_params$target.N,
+    system.role  = validated_params$system.role,
+    custom       = FALSE,
+    cleaner_fun  = cleaner_fun_p,
+    adaptive     = validated_params$adaptive,
+    model        = validated_params$model,
+    temperature  = validated_params$temperature,
+    top.p        = validated_params$top.p,
+    groq.API     = validated_params$groq.API,
+    openai.API   = validated_params$openai.API,
+    silently     = validated_params$silently
+  )
+
+  return(items_df)
+}

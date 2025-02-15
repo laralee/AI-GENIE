@@ -351,3 +351,136 @@ validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, mo
 
   return(list(openai.API=openai.API, groq.API=groq.API, user.prompts=user.prompts, model=model, system.role=system.role))
 }
+
+# P_AIGENIE ----
+
+#' Validate All Parameters for Performance AIGENIE (`p_AIGENIE`)
+#'
+#' Validates all parameters needed for Performance AIGENIE (`p_AIGENIE`). This function performs the following:
+#' \enumerate{
+#'   \item Validates simple parameters:
+#'     \itemize{
+#'       \item \code{scale.title}: A single trimmed string or \code{NULL}.
+#'       \item \code{audience}: A single trimmed string or \code{NULL}.
+#'       \item \code{subject}: A single trimmed string or \code{NULL}.
+#'       \item \code{silently}: A logical flag indicating whether to suppress console output.
+#'     }
+#'   \item Validates complex parameters:
+#'     \itemize{
+#'       \item \code{item.attributes}: A named list of character vectors of subcategories (validated by \code{validate_item_attributes_p}).
+#'       \item \code{difficulty_level}: Either a named list or a vector of difficulty levels (validated by \code{validate_difficulty_level}).
+#'       \item \code{item.examples}: A data frame with columns \code{type}, \code{attribute}, \code{item}, and \code{answer} (validated by \code{validate_item_examples_p}).
+#'     }
+#'   \item Validates LLM parameters:
+#'     \itemize{
+#'       \item \code{model}: A string specifying the LLM model to be used (validated by \code{validate_model}).
+#'       \item \code{openai.API}: A required string containing the OpenAI API key.
+#'       \item \code{groq.API}: An optional string containing the Groq API key; required if using an open-source model.
+#'       \item \code{temperature}: A numeric value between 0 and 2 for the LLM model temperature.
+#'       \item \code{top.p}: A numeric value between 0 and 1 for top-p sampling.
+#'       \item \code{system.role}: An optional string describing the system role for the LLM.
+#'     }
+#'   \item Validates the API keys using \code{validate_api_keys} with the validated model.
+#'   \item Validates the \code{temperature} and \code{top.p} parameters using \code{validate_temperature_top.p}.
+#'   \item Validates the \code{system.role} parameter using \code{validate_system_role}.
+#' }
+#'
+#' @param item_attributes A named list where each name corresponds to an item type and each element is a character vector of subcategories.
+#' @param difficulty_level Either a named list of difficulty vectors or a vector of difficulties.
+#' @param item.examples A data frame containing columns: \code{type}, \code{attribute}, \code{item}, and \code{answer}.
+#' @param scale.title A string representing the title of the scale, with whitespace trimmed, or \code{NULL}.
+#' @param audience A string representing the intended audience, with whitespace trimmed, or \code{NULL}.
+#' @param subject A string representing the subject, with whitespace trimmed, or \code{NULL}.
+#' @param silently A logical flag indicating whether to suppress console output.
+#' @param model A character string specifying the LLM model to be used (e.g., "gpt3.5", "llama3").
+#' @param groq.API An optional character string of the Groq API key. Required if using an open-source model.
+#' @param openai.API A required character string of the OpenAI API key.
+#' @param temperature A numeric value between 0 and 2 for setting the model's temperature.
+#' @param top.p A numeric value between 0 and 1 for top-p sampling.
+#' @param system.role An optional string containing the system role for the LLM.
+#' @param target.N Either a single numeric value or a nested list of numeric values specifying the number of items to generate of each type.
+#' @param adaptive Logical; if \code{TRUE}, uses adaptive prompting to avoid generating redundant items.
+#'
+#' @return A named list containing all validated and normalized parameters.
+validate_p_AIGENIE_parameters <- function(item_attributes, difficulty_level, item.examples,
+                                    scale.title = NULL, audience = NULL, subject = NULL, silently = FALSE,
+                                    model, groq.API, openai.API,
+                                    temperature, top.p, system.role = NULL, target.N, adaptive) {
+
+  # Validate simple parameters.
+  if (!is.null(scale.title)) {
+    if (!is.character(scale.title) || length(scale.title) != 1) {
+      stop("scale.title must be a single string or NULL.")
+    }
+    scale.title <- trimws(scale.title)
+  }
+
+  if (!is.null(audience)) {
+    if (!is.character(audience) || length(audience) != 1) {
+      stop("audience must be a single string or NULL.")
+    }
+    audience <- trimws(audience)
+  }
+
+  if (!is.null(subject)) {
+    if (!is.character(subject) || length(subject) != 1) {
+      stop("subject must be a single string or NULL.")
+    }
+    subject <- trimws(subject)
+  }
+
+  if (silently != TRUE && silently !=FALSE) {
+    stop("silently must be a logical flag (TRUE or FALSE).")
+  }
+
+  if(adaptive != TRUE && adaptive !=FALSE){
+    stop("adaptive is a logical flag and must be set to TRUE or FALSE.")
+  }
+
+  # Validate item.attributes using the helper function.
+  validated_item_attributes <- validate_item_attributes_p(item_attributes)
+
+  # Validate difficulty_level using the helper function.
+  validated_difficulty_level <- validate_difficulty_level(difficulty_level, validated_item_attributes)
+
+  # Validate target.N
+  validated_target_n <- validate_target_N_p(target.N, validated_item_attributes, validated_difficulty_level)
+
+  # Validate item.examples using the updated helper function.
+  # Pass the normalized difficulty levels (expected_difficulty_levels) to the function.
+  validated_item_examples <- validate_item_examples_p(item.examples,
+                                                      item_attributes = validated_item_attributes,
+                                                      expected_difficulty_levels = validated_difficulty_level,
+                                                      silently = silently)
+
+  # Validate the model.
+  validated_model <- validate_model(model, silently = silently)
+
+  # Validate the API keys using the validated model.
+  validated_api_keys <- validate_api_keys(openai.API, groq.API, validated_model)
+
+  # Validate temperature and top.p.
+  validated_temp_top <- validate_temperature_top.p(temperature, top.p)
+
+  # Validate system.role.
+  validated_system_role <- validate_system_role(system.role)
+
+  # Return a named list with all validated parameters.
+  return(list(
+    item.attributes   = validated_item_attributes,
+    difficulty_level  = validated_difficulty_level,
+    item.examples     = validated_item_examples,
+    scale.title       = scale.title,
+    audience          = audience,
+    subject           = subject,
+    silently          = silently,
+    model             = validated_model,
+    openai.API        = validated_api_keys$openai.API,
+    groq.API          = validated_api_keys$groq.API,
+    temperature       = validated_temp_top$temperature,
+    top.p             = validated_temp_top$top.p,
+    system.role       = validated_system_role,
+    target.N          = validated_target_n,
+    adaptive          = adaptive
+  ))
+}

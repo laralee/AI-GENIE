@@ -1108,3 +1108,323 @@ clean_EGA_output <- function(ega_obj, item_set) {
   }
   list(ega_obj = ega_obj, item_set = item_set)
 }
+
+
+#' Build the Main Prompt for Performance AIGENIE (p_AIGENIE)
+#'
+#' Constructs the primary prompt for the LLM using the provided parameters. This version is tailored
+#' for p_AIGENIE so that the LLM is instructed to output each generated item in the following format:
+#' "item:answer". Because the prompt is already specific to a given item type, attribute, and difficulty,
+#' those values are not included in the output format.
+#'
+#' @param scale.title A string representing the title of the scale. If \code{NULL}, no title is added.
+#' @param subject A string representing the subject area. If \code{NULL}, subject is omitted.
+#' @param audience A string representing the target audience. If \code{NULL}, "users" will be used.
+#' @param ability_level A string indicating the ability level (e.g., "medium") being assessed.
+#' @param difficulty A string indicating the difficulty level (in uppercase, e.g., "MEDIUM") for item generation.
+#' @param attribute A string representing the specific item attribute (e.g., "reducing fractions").
+#' @param examples A string containing well-formatted example items (each on its own line) to guide the LLM.
+#'        If \code{NULL}, no examples are appended.
+#'
+#' @return A character string containing the fully constructed main prompt.
+build_main_prompt <- function(scale.title, subject, audience, ability_level, difficulty, attribute, examples) {
+
+  # Use audience if provided; otherwise default to "users"
+  audience_text <- ifelse(is.null(audience) || audience == "", "users", audience)
+
+  # Capitalize the ability level for emphasis
+  ability_upper <- toupper(ability_level)
+
+  # Build the prompt text.
+  # Note: The instructions now specify that the output format MUST be "item:answer", one per line.
+  main_prompt <- paste0(
+    "You are creating items for a performance-based scale",
+    ifelse(is.null(scale.title), ".", paste0(" called '", scale.title, "'.")),
+    " As such, these items should assess one’s ability level",
+    ifelse(is.null(subject), ".", paste0(" in the subject of ", subject, ".")),
+    " Design these items for ", audience_text, ".",
+    " For now, you will focus on generating items meant to distinguish between ", audience_text,
+    " who have a ", ability_upper, " ability level.",
+    " Therefore, it is VERY important that you create items that are of ", difficulty, " difficulty.",
+    " Generate EXACTLY TEN items pertaining to ", attribute, ".",
+    " For now, ONLY generate items that assess ", attribute, ". Do NOT create any other item type.",
+    " Place EACH item on its own line, and format each item EXACTLY as follows:",
+    " item||answer",
+    " (that is, the item statement, followed by a '||', followed by the correct answer).",
+    " Do NOT include any additional text or formatting. Do NOT number the output. Do NOT label the items. You should ONLY include the properly formatted items.",
+    ifelse(is.null(examples), "", paste0(" Here are some examples of well-written items:\n", examples))
+  )
+
+  return(main_prompt)
+}
+
+
+
+#' Cleaner Function for Performance AIGENIE (p_AIGENIE) with Robust Formatting
+#'
+#' Cleans and parses the language model's response to extract item statements and their corresponding answers.
+#' It first attempts to use the multi-format strategy via \code{try_formats} for robust cleaning.
+#' If valid output is obtained, it then expects each line to follow the "item:answer" format.
+#' If the robust cleaning fails, it falls back to a simple line-by-line split.
+#'
+#' @param response The response object from the language model API call. Expected to contain the text in
+#'   \code{response$choices[[1]]$message$content}.
+#' @param split_content A character vector of stemmed item attributes (provided for compatibility with try_formats).
+#' @param current_items A data frame of items collected so far, with columns: \code{type}, \code{attribute},
+#'   \code{statement}, \code{answer}, and \code{difficulty}. Defaults to an empty data frame.
+#' @param current_label A string indicating the current item type (e.g., "fractions").
+#' @param attribute A string indicating the current attribute (e.g., "reducing fractions").
+#' @param difficulty A string indicating the difficulty level (in uppercase, e.g., "MEDIUM") for this group.
+#'
+#' @return A data frame with columns: \code{type}, \code{attribute}, \code{statement}, \code{answer}, and \code{difficulty},
+#'         containing the cleaned items with duplicates removed.
+cleaner_fun_p <- function(response, split_content,
+                          current_items = data.frame(type = character(),
+                                                     attribute = character(),
+                                                     statement = character(),
+                                                     answer = character(),
+                                                     difficulty = character(),
+                                                     stringsAsFactors = FALSE),
+                          current_label, attribute, difficulty) {
+
+  # Helper function to parse lines in "item||answer" format.
+  parse_lines <- function(lines) {
+    parsed_items <- list()
+    for (line in lines) {
+      # Expecting format "item||answer"
+      if (grepl("||", line)) {
+        parts <- unlist(strsplit(line, "||", fixed = TRUE))
+        if (length(parts) < 2) next
+        # First part is item; remainder combined forms answer.
+        item_statement <- trimws(parts[1])
+        answer <- trimws(paste(parts[-1], collapse="||"))
+        parsed_items[[length(parsed_items) + 1]] <- data.frame(
+          type = current_label,
+          attribute = attribute,
+          statement = item_statement,
+          answer = answer,
+          difficulty = difficulty,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+    if (length(parsed_items) > 0) {
+      return(do.call(rbind, parsed_items))
+    } else {
+      return(NULL)
+    }
+  }
+
+  deepseek_format_p <- function(response, split_content) {
+
+    # Extract the response content
+    response_text <- response$choices[[1]]$message$content
+
+    # Remove <think> and other explanatory text
+    response_text <- gsub("<think>.*?</think>", "", response_text, perl = TRUE)
+
+    # Split by new lines and trim whitespace
+    items <- trimws(strsplit(response_text, "\n")[[1]])
+
+    # Remove empty lines
+    items <- items[nzchar(items)]
+
+    # Filter only properly formatted items (e.g., "trait|| statement")
+    items <- items[grepl("^[a-zA-Z]+|| ", items)]
+
+    # Separate characteristics and item statements
+    characteristics <- trimws(gsub("||.*", "", items))
+    items <- trimws(gsub(".*||", "", items))
+
+    # Return extracted items
+    return(list(characteristics = characteristics, items = items))
+  }
+
+  gemma_format_p <- function(response, split_content)
+  {
+
+    ## Clean the response so only the items are retained
+    items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
+    items <- trimws(items)
+    items <- items[nzchar(items)]
+    items <- gsub("\\*", "", items)
+
+    # Separate characteristics and items
+    characteristics <- trimws(gsub("||.*", "", items))
+    items <- trimws(gsub(".*||", "", items))
+
+    # Return items and characteristics
+    return(list(characteristics = characteristics, items = items))
+
+  }
+
+  llama_format_p <- function(response, split_content)
+  {
+
+    ## Clean the response so only the items are retained
+    items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
+    items <- trimws(items)
+    items <- items[nzchar(items)]
+    items <- gsub("\\*", "", items)
+
+    ## Characteristics index
+    characteristics_index <- logical(length(items))
+    for(i in seq_along(split_content)){
+
+      ## Get locations
+      locations <- grepl(split_content[i], tm::stemDocument(flatten_text(items)))
+
+      ## Update index
+      characteristics_index[locations] <- TRUE
+
+    }
+
+    # Separate characteristics and items
+    characteristics <- rep(
+      trimws(gsub("||.*", "", items))[characteristics_index],
+      each = 2
+    )
+    items <- trimws(gsub(".*||", "", items))
+
+    # Return items and characteristics
+    return(list(characteristics = characteristics, items = items))
+
+  }
+
+  mixtral_format_p <- function(response, split_content)
+  {
+
+    ## Clean the response so only the items are retained
+    items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
+    items <- trimws(items)
+    items <- items[nzchar(items)]
+    items <- gsub("\\*", "", items)
+
+    ## Characteristics index
+    characteristics_index <- tm::stemDocument(flatten_text(items)) %in% split_content
+
+    ## Get characteristics
+    characteristics <- items[characteristics_index]
+    items <- items[!characteristics_index]
+
+    # Separate characteristics and items
+    characteristics <- rep(trimws(gsub("||.*", "", characteristics)), each = 2)
+    items <- gsub("\\-", "", items)
+    items <- trimws(gsub(".*||", "", items))
+
+    # Return items and characteristics
+    return(list(characteristics = characteristics, items = items))
+
+  }
+
+  try_formats_p <- function(response, split_content)
+  {
+    # Try DeepSeek first
+    deepseek <- deepseek_format_p(response, split_content)
+
+    ## Set items and characteristics
+    items <- deepseek$items
+    characteristics <- deepseek$characteristics
+
+    ## Update stems
+    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
+    stemmed_items <- tm::stemDocument(flatten_text(items))
+
+    # Check for errors in generation
+    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
+      any(stemmed_items %in% split_content) ||
+      length(characteristics) != length(items)
+
+    # If DeepSeek parsing works, return it
+    if(!formatting_issue){
+      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+    }
+
+    # If DeepSeek fails, fall back to existing formats
+    # Try Gemma:
+    gemma <- gemma_format_p(response, split_content)
+    items <- gemma$items
+    characteristics <- gemma$characteristics
+    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
+    stemmed_items <- tm::stemDocument(flatten_text(items))
+
+    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
+      any(stemmed_items %in% split_content) ||
+      length(characteristics) != length(items)
+
+    if(!formatting_issue){
+      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+    }
+
+    # Try Mixtral:
+    mixtral <- mixtral_format_p(response, split_content)
+    items <- mixtral$items
+    characteristics <- mixtral$characteristics
+    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
+    stemmed_items <- tm::stemDocument(flatten_text(items))
+
+    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
+      any(stemmed_items %in% split_content) ||
+      length(characteristics) != length(items)
+
+    if(!formatting_issue){
+      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+    }
+
+    # Try LLAMA-3:
+    llama <- llama_format_p(response, split_content)
+    items <- llama$items
+    characteristics <- llama$characteristics
+    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
+    stemmed_items <- tm::stemDocument(flatten_text(items))
+
+    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
+      any(stemmed_items %in% split_content) ||
+      length(characteristics) != length(items)
+
+    if(!formatting_issue){
+      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+    }
+
+    # Return empty list if nothing worked
+    return(list(stemmed_characteristics = NA, items = NA))
+  }
+
+
+  # Attempt to use try_formats for robust cleaning.
+  formats <- try_formats_p(response, split_content)
+  new_items <- NULL
+
+  if (!is.null(formats$items) && !any(is.na(formats$items)) && length(formats$items) > 0) {
+    # Use the items from try_formats, split them line-by-line.
+    lines <- unlist(strsplit(paste(formats$items, collapse="\n"), "\n"))
+    lines <- trimws(lines)
+    lines <- lines[nzchar(lines)]
+    new_items <- parse_lines(lines)
+  }
+
+  # If try_formats did not yield valid items, fall back to raw response splitting.
+  if (is.null(new_items) || nrow(new_items) == 0) {
+    if (!is.null(response$choices) && length(response$choices) > 0) {
+      response_text <- response$choices[[1]]$message$content
+    } else {
+      stop("Response does not contain expected content.")
+    }
+    lines <- unlist(strsplit(response_text, "\n"))
+    lines <- trimws(lines)
+    lines <- lines[nzchar(lines)]
+    new_items <- parse_lines(lines)
+  }
+
+  # If still no new items, return the current_items unchanged.
+  if (is.null(new_items) || nrow(new_items) == 0) {
+    return(current_items)
+  }
+
+  # Combine with current items and remove duplicates based on a flattened version of the statement.
+  combined_items <- rbind(current_items, new_items)
+  flat_statements <- tolower(gsub("[[:punct:]]", "", combined_items$statement))
+  combined_items <- combined_items[!duplicated(flat_statements), ]
+
+  return(combined_items)
+}

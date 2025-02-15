@@ -915,3 +915,301 @@ generate_output <- function(openai.API, groq.API,
 }
 
 
+
+
+#' Build Nested Prompts for Performance AIGENIE (p_AIGENIE) with Simplified Examples
+#'
+#' Constructs a nested list of main prompts for p_AIGENIE. The prompts are organized by:
+#' \enumerate{
+#'   \item Item type (outer list; e.g., "fractions"),
+#'   \item Item attribute (inner list; e.g., "reducing fractions"),
+#'   \item Difficulty level (innermost list; e.g., "MEDIUM").
+#' }
+#'
+#' For each prompt, the function extracts relevant examples from the \code{item.examples} data frame
+#' by filtering on type, attribute, and difficulty. Each example is formatted as "item:answer"
+#' (without additional context). The constructed examples string is then appended to the prompt.
+#'
+#' @param scale.title A string representing the scale title (or \code{NULL}).
+#' @param subject A string representing the subject area (or \code{NULL}).
+#' @param audience A string representing the target audience (or \code{NULL}).
+#' @param item_attributes A named list where each key is an item type and each value is a character vector of attributes.
+#' @param difficulty_level A nested named list (mirroring item_attributes) where each attribute maps to a vector
+#'        of difficulty levels (e.g., c("LOW", "MEDIUM", "HIGH")).
+#' @param item.examples A validated data frame containing columns: \code{type}, \code{attribute}, \code{item},
+#'        \code{answer}, and \code{difficulty}.
+#'
+#' @return A nested list of prompts, where the outer keys are item types, the inner keys are attributes,
+#'         and the innermost keys are difficulty levels.
+#'
+build_prompts <- function(scale.title, subject, audience,
+                          item_attributes, difficulty_level, item.examples) {
+
+  prompts <- list()
+
+  # Iterate over each item type (category)
+  for (cat in names(item_attributes)) {
+    prompts[[cat]] <- list()
+
+    # Iterate over each attribute within the category
+    for (att in item_attributes[[cat]]) {
+      prompts[[cat]][[att]] <- list()
+
+      # Iterate over each difficulty level for this attribute
+      for (diff in difficulty_level[[cat]][[att]]) {
+        # Filter examples that match the current type, attribute, and difficulty.
+        subset_rows <- item.examples[
+          item.examples$type == cat &
+            item.examples$attribute == att &
+            item.examples$difficulty == diff,
+        ]
+
+        if (nrow(subset_rows) > 0) {
+          # Format each example as "item||answer"
+          examples_str <- paste(apply(subset_rows, 1, function(row) {
+            paste0(trimws(row["item"]), "||", trimws(row["answer"]))
+          }), collapse = "\n")
+          # Prepend a newline so the examples appear clearly separated.
+          examples_str <- paste0("\n", examples_str)
+        } else {
+          examples_str <- NULL
+        }
+
+        # Build the main prompt using the updated instructions.
+        prompt <- build_main_prompt(
+          scale.title = scale.title,
+          subject = subject,
+          audience = audience,
+          ability_level = tolower(diff),  # ability level (converted to lower-case as per previous logic)
+          difficulty = diff,              # difficulty in uppercase for emphasis
+          attribute = att,
+          examples = examples_str
+        )
+
+        prompts[[cat]][[att]][[diff]] <- prompt
+      }
+    }
+  }
+
+  return(prompts)
+}
+
+
+
+
+
+#' Generate Items Internally for Performance AIGENIE (p_AIGENIE)
+#'
+#' This function drives the item generation process for p_AIGENIE. It iterates over each item type,
+#' attribute, and difficulty level (as defined by the nested prompts and target.N), repeatedly calling the
+#' language model API until the target number of unique items is generated or until error thresholds are met.
+#' Adaptive prompting is supported (if adaptive = TRUE), and robust error handling ensures the process does not loop indefinitely.
+#'
+#' @param prompts A nested list of prompts, organized by item type, attribute, and difficulty.
+#' @param target.N A nested list of target numbers (or a single integer applied to all prompts) specifying how many items to generate.
+#' @param system.role A character string specifying the system role for the LLM. If NULL, a generic system role is used.
+#' @param custom Logical; if TRUE, user-supplied prompts and cleaning function are used.
+#' @param cleaner_fun A cleaning function to parse the LLM output. In default mode, this should be \code{cleaner_fun_p}.
+#' @param adaptive Logical; if TRUE, previously generated items are included in subsequent API calls.
+#' @param model A character string specifying the language model to use.
+#' @param temperature Numeric; the model's temperature (range: 0–2).
+#' @param top.p Numeric; the model's top-p sampling parameter (range: 0–1).
+#' @param groq.API A character string containing the Groq API key (if needed).
+#' @param openai.API A character string containing the OpenAI API key.
+#' @param silently Logical; if TRUE, progress and status messages are suppressed.
+#' @param ... Additional arguments passed to underlying API calls.
+#'
+#' @return A data frame containing the generated items with columns: \code{type}, \code{statement}, \code{answer}, and \code{difficulty}.
+generate.items.internal.p <- function(prompts, target.N, system.role, custom = FALSE, cleaner_fun = cleaner_fun_p,
+                                      adaptive = FALSE,
+                                      model, temperature, top.p, groq.API, openai.API, silently = FALSE, ...) {
+
+  # --- Model Switching ---
+  model <- switch(
+    model,
+    "llama3" = "llama3-8b-8192",
+    "gemma2" = "gemma2-9b-it",
+    "mixtral" = "mixtral-8x7b-32768",
+    "gpt3.5" = "gpt-3.5-turbo",
+    "gpt4o" = "gpt-4o",
+    "deepseek" = "deepseek-r1-distill-llama-70b",
+    model
+  )
+
+  # --- System Role ---
+  if (is.null(system.role)) {
+    system.role <- "You are an expert item developer for a performance-based assessment."
+  }
+
+  # --- API Determination ---
+  if (grepl("gpt", model) || grepl("o1", model) || grepl("o3", model)) {
+    openai <- reticulate::import("openai")
+    openai$api_key <- openai.API
+    generate_FUN <- openai$ChatCompletion$create
+    max_tokens_set <- 4096L
+  } else {
+    groq <- reticulate::import("groq")
+    groq_client <- groq$Groq(api_key = groq.API)
+    generate_FUN <- groq_client$chat$completions$create
+    max_tokens_set <- 7000L
+  }
+
+  # --- Setting Completion Parameters ---
+  if (grepl("o1", model) || grepl("o3", model)) {
+    completion_param <- "max_completion_tokens"
+    completion_value <- 20000L
+  } else {
+    completion_param <- "max_tokens"
+    completion_value <- max_tokens_set
+  }
+
+  # --- Helper Function for API Calls ---
+  call_generate_FUN <- function(messages_list) {
+    call_params <- list(
+      model = model,
+      messages = messages_list,
+      temperature = temperature,
+      top_p = top.p
+    )
+    call_params[[completion_param]] <- completion_value
+    do.call(generate_FUN, call_params)
+  }
+
+  # --- Item Generation Loop ---
+  items_df <- data.frame(type = character(),
+                         statement = character(),
+                         answer = character(),
+                         difficulty = character(),
+                         stringsAsFactors = FALSE)
+
+  # Iterate over each item type
+  for (cat in names(prompts)) {
+    if (!silently) {
+      cat(paste("Generating items for", cat, "...\n"))
+      flush.console()
+    }
+
+    target_N_cat <- target.N[[cat]]
+
+    # Iterate over each attribute
+    for (att in names(prompts[[cat]])) {
+      target_N_att <- target_N_cat[[att]]
+
+      # Iterate over each difficulty level
+      for (diff in names(prompts[[cat]][[att]])) {
+        target_N_val <- target_N_att[[diff]]
+        prompt <- prompts[[cat]][[att]][[diff]]
+
+        unique_items <- character()
+        items_df_temp <- data.frame(type = character(),
+                                    statement = character(),
+                                    answer = character(),
+                                    difficulty = character(),
+                                    stringsAsFactors = FALSE)
+
+        error_count <- 0
+        consecutive_no_new_items <- 0
+        max_consecutive_errors <- 10
+
+        # Generation loop for a given category-att-diff group
+        while (length(unique_items) < target_N_val) {
+          response <- tryCatch({
+            # Adaptive prompting: include only items from the current group.
+            if (adaptive && length(unique_items) > 0) {
+              max_sample_size <- 50  # Adjust based on context window
+              sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
+              previous_items_text <- paste(sampled_items, collapse = "\n")
+              constructed_content <- paste0(prompt, "\nDo NOT repeat or rephrase any items from the following list:\n", previous_items_text, "\n")
+            } else {
+              constructed_content <- prompt
+            }
+
+            messages_list <- list(
+              list("role" = "system", "content" = system.role),
+              list("role" = "user", "content" = constructed_content)
+            )
+
+            R.utils::withTimeout({
+              call_generate_FUN(messages_list)
+            }, timeout = 20, onTimeout = "error")
+          },
+          error = function(e) {
+            error_count <<- error_count + 1
+            if (error_count >= max_consecutive_errors) {
+              if (!silently) {
+                cat("\nCritical API error encountered: ", conditionMessage(e), "\n")
+              }
+              return(NULL)
+            }
+            structure(list(), class = "try-error")
+          })
+
+          if (is.null(response) || inherits(response, "try-error")) {
+            consecutive_no_new_items <- consecutive_no_new_items + 1
+            if (consecutive_no_new_items >= max_consecutive_errors) {
+              if (!silently) {
+                cat(paste("\nNo new items generated for", att, "(", tolower(diff), " difficulty) after multiple attempts.\n"))
+              }
+              break
+            }
+            next
+          } else {
+            error_count <- 0
+          }
+
+          # Clean the API response using the cleaning function
+          current_items <- items_df_temp
+          cleaned_items <- tryCatch({
+            cleaner_fun(response, split_content = NULL, current_items = current_items,
+                        current_label = cat, attribute = att, difficulty = diff)
+          }, error = function(e) {
+            if (!silently) {
+              cat("\nError during cleaning:", conditionMessage(e), "\n")
+            }
+            return(current_items)
+          })
+
+          # Deduplicate: only new statements
+          new_unique_items <- setdiff(cleaned_items$statement, unique_items)
+
+          if (length(new_unique_items) == 0) {
+            consecutive_no_new_items <- consecutive_no_new_items + 1
+          } else {
+            consecutive_no_new_items <- 0
+            unique_items <- unique(c(unique_items, new_unique_items))
+          }
+
+          items_df_temp <- cleaned_items
+
+          # Simplified console output: show attribute and difficulty info
+          if (!silently) {
+            cat(sprintf("\rItems generated for %s (%s difficulty): %d", att, tolower(diff), length(unique_items)))
+            flush.console()
+          }
+        } # End while loop
+
+        # Append generated items for this group to the overall data frame
+        items_df <- rbind(items_df, items_df_temp)
+
+        if (!silently) {
+          cat("\n")
+        }
+      } # End difficulty loop
+    } # End attribute loop
+  } # End category loop
+
+  # --- Post-processing and Finalization ---
+  items_df$statement <- trimws(items_df$statement)
+  items_df$answer <- trimws(items_df$answer)
+  items_df$difficulty <- trimws(items_df$difficulty)
+
+  flat_statements <- tolower(gsub("[[:punct:]]", "", items_df$statement))
+  items_df <- items_df[!duplicated(flat_statements), ]
+  rownames(items_df) <- NULL
+
+  if (!silently) {
+    cat(paste0("\nAll items generated. Final sample size: ", nrow(items_df), "\n"))
+  }
+
+  return(items_df)
+}
