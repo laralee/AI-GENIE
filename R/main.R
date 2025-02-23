@@ -721,6 +721,11 @@ validate_prompt <- function(openai.API=NULL, groq.API = NULL,
 #' @param subject A string representing the subject, or \code{NULL}.
 #' @param silently Logical; if \code{TRUE}, progress messages are suppressed.
 #' @param model A character string specifying the LLM model to use (e.g., "gpt3.5", "llama3").
+#' @param embedding.model A character string specifying the OpenAI embedding model to use (e.g., \code{"text-embedding-3-small"}, \code{"text-embedding-3-large"}, or \code{"text-embedding-ada-002"}).
+#'                        Defaults to \code{"text-embedding-3-small"}.
+#' @param EGA.model An optional character string specifying the EGA model to use (e.g., \code{"tmfg"} or \code{"glasso"}). If set to \code{NULL},
+#'                  both models are evaluated, and the one with the highest Normalized Mutual Information (NMI) is selected.
+#' @param EGA.algorithm A character string specifying the clustering algorithm for EGA. Options include \code{"walktrap"}, \code{"louvain"}, or \code{"leiden"}. Defaults to \code{"walktrap"}.
 #' @param groq.API An optional string with the Groq API key (if applicable).
 #' @param openai.API A required string with the OpenAI API key.
 #' @param temperature Numeric; the model's temperature (range: 0–2).
@@ -731,9 +736,10 @@ validate_prompt <- function(openai.API=NULL, groq.API = NULL,
 #'
 #' @return A data frame with columns: \code{type}, \code{statement}, \code{answer}, and \code{difficulty}.
 #'
-p_AIGENIE <- function(item_attributes, difficulty_level, item.examples,
+p_AIGENIE <- function(item_attributes, difficulty_level, item.examples=NULL,
                       scale.title = NULL, audience = NULL, subject = NULL, silently = FALSE,
-                      model, groq.API, openai.API,
+                      model="gpt3.5", embedding.model="text-embedding-3-small", EGA.model=NULL,
+                      EGA.algorithm = "walktrap", groq.API, openai.API,
                       temperature=1, top.p=1, system.role = NULL, target.N=30, adaptive=TRUE) {
 
   # Validate all parameters.
@@ -780,6 +786,15 @@ p_AIGENIE <- function(item_attributes, difficulty_level, item.examples,
     openai.API   = validated_params$openai.API,
     silently     = validated_params$silently
   )
+
+  items_df$type <- items_df$attribute
+  items_df$attribute <- items_df$difficulty
+
+  run_pipeline(items = items_df[,c("statement", "type", "attribute")], EGA.model = EGA.model, EGA.algorithm= EGA.algorithm,
+               openai.key=openai.API, embedding.model=embedding.model,
+               labels = items_df$type, keep.org=FALSE, plot = TRUE, plot.stability = FALSE,
+               silently= silently, calc.final.stability = FALSE)
+
 
   return(items_df)
 }

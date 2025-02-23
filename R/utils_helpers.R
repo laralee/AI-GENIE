@@ -37,7 +37,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
     if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[current_type]])) {
       definition <- item.type.definitions[[current_type]]
       definition <- substr(definition, 1, 250)
-      definition <- paste0("Definition of '", current_type, "': ", definition, "\n")
+      definition <- paste0("Definition of '", current_type, "'@", definition, "\n")
     }
 
     # Construct the prompt for all prompts
@@ -48,8 +48,9 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
       current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic." ,
       "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
-      "\nFOLLOW this format EXACTLY for each item:\n<characteristic>: <item content>",
-      "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
+      "\nFOLLOW this format EXACTLY for each item:\n<characteristic>@<item content>",
+      "\nThis format is EXTREMELY important: the characteristic, followed by @, followed by the item statement.",
+      "Do NOT number or add ANY other text to your response. EACH item should go on its own line.",
       "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
     )
   }
@@ -169,12 +170,12 @@ deepseek_format <- function(response, split_content) {
   # Remove empty lines
   items <- items[nzchar(items)]
 
-  # Filter only properly formatted items (e.g., "trait: statement")
-  items <- items[grepl("^[a-zA-Z]+: ", items)]
+  # Filter only properly formatted items (e.g., "trait@statement")
+  items <- items[grepl("^[a-zA-Z]+@", items)]
 
   # Separate characteristics and item statements
-  characteristics <- trimws(gsub(":.*", "", items))
-  items <- trimws(gsub(".*: ", "", items))
+  characteristics <- trimws(gsub("@.*", "", items))
+  items <- trimws(gsub(".*@", "", items))
 
   # Return extracted items
   return(list(characteristics = characteristics, items = items))
@@ -198,8 +199,8 @@ gemma_format <- function(response, split_content)
   items <- gsub("\\*", "", items)
 
   # Separate characteristics and items
-  characteristics <- trimws(gsub(":.*", "", items))
-  items <- trimws(gsub(".*: ", "", items))
+  characteristics <- trimws(gsub("@.*", "", items))
+  items <- trimws(gsub(".*@", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -230,9 +231,9 @@ mixtral_format <- function(response, split_content)
   items <- items[!characteristics_index]
 
   # Separate characteristics and items
-  characteristics <- rep(trimws(gsub(":.*", "", characteristics)), each = 2)
+  characteristics <- rep(trimws(gsub("@.*", "", characteristics)), each = 2)
   items <- gsub("\\-", "", items)
-  items <- trimws(gsub(".*: ", "", items))
+  items <- trimws(gsub(".*@", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -270,10 +271,10 @@ llama_format <- function(response, split_content)
 
   # Separate characteristics and items
   characteristics <- rep(
-    trimws(gsub(":.*", "", items))[characteristics_index],
+    trimws(gsub("@.*", "", items))[characteristics_index],
     each = 2
   )
-  items <- trimws(gsub(".*: ", "", items))
+  items <- trimws(gsub(".*@", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -1149,8 +1150,8 @@ build_main_prompt <- function(scale.title, subject, audience, ability_level, dif
     " Generate EXACTLY TEN items pertaining to ", attribute, ".",
     " For now, ONLY generate items that assess ", attribute, ". Do NOT create any other item type.",
     " Place EACH item on its own line, and format each item EXACTLY as follows:",
-    " item||answer",
-    " (that is, the item statement, followed by a '||', followed by the correct answer).",
+    " item@answer",
+    " (that is, the item statement, followed by a '@', followed by the correct answer).",
     " Do NOT include any additional text or formatting. Do NOT number the output. Do NOT label the items. You should ONLY include the properly formatted items.",
     ifelse(is.null(examples), "", paste0(" Here are some examples of well-written items:\n", examples))
   )
@@ -1164,7 +1165,7 @@ build_main_prompt <- function(scale.title, subject, audience, ability_level, dif
 #'
 #' Cleans and parses the language model's response to extract item statements and their corresponding answers.
 #' It first attempts to use the multi-format strategy via \code{try_formats} for robust cleaning.
-#' If valid output is obtained, it then expects each line to follow the "item:answer" format.
+#' If valid output is obtained, it then expects each line to follow the "item@answer" format.
 #' If the robust cleaning fails, it falls back to a simple line-by-line split.
 #'
 #' @param response The response object from the language model API call. Expected to contain the text in
@@ -1187,17 +1188,17 @@ cleaner_fun_p <- function(response, split_content,
                                                      stringsAsFactors = FALSE),
                           current_label, attribute, difficulty) {
 
-  # Helper function to parse lines in "item||answer" format.
+  # Helper function to parse lines in "item@answer" format.
   parse_lines <- function(lines) {
     parsed_items <- list()
     for (line in lines) {
-      # Expecting format "item||answer"
-      if (grepl("||", line)) {
-        parts <- unlist(strsplit(line, "||", fixed = TRUE))
+      # Expecting format "item@answer"
+      if (grepl("@", line)) {
+        parts <- unlist(strsplit(line, "@", fixed = TRUE))
         if (length(parts) < 2) next
         # First part is item; remainder combined forms answer.
         item_statement <- trimws(parts[1])
-        answer <- trimws(paste(parts[-1], collapse="||"))
+        answer <- trimws(paste(parts[-1], collapse="@"))
         parsed_items[[length(parsed_items) + 1]] <- data.frame(
           type = current_label,
           attribute = attribute,
@@ -1215,184 +1216,8 @@ cleaner_fun_p <- function(response, split_content,
     }
   }
 
-  deepseek_format_p <- function(response, split_content) {
-
-    # Extract the response content
-    response_text <- response$choices[[1]]$message$content
-
-    # Remove <think> and other explanatory text
-    response_text <- gsub("<think>.*?</think>", "", response_text, perl = TRUE)
-
-    # Split by new lines and trim whitespace
-    items <- trimws(strsplit(response_text, "\n")[[1]])
-
-    # Remove empty lines
-    items <- items[nzchar(items)]
-
-    # Filter only properly formatted items (e.g., "trait|| statement")
-    items <- items[grepl("^[a-zA-Z]+|| ", items)]
-
-    # Separate characteristics and item statements
-    characteristics <- trimws(gsub("||.*", "", items))
-    items <- trimws(gsub(".*||", "", items))
-
-    # Return extracted items
-    return(list(characteristics = characteristics, items = items))
-  }
-
-  gemma_format_p <- function(response, split_content)
-  {
-
-    ## Clean the response so only the items are retained
-    items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-    items <- trimws(items)
-    items <- items[nzchar(items)]
-    items <- gsub("\\*", "", items)
-
-    # Separate characteristics and items
-    characteristics <- trimws(gsub("||.*", "", items))
-    items <- trimws(gsub(".*||", "", items))
-
-    # Return items and characteristics
-    return(list(characteristics = characteristics, items = items))
-
-  }
-
-  llama_format_p <- function(response, split_content)
-  {
-
-    ## Clean the response so only the items are retained
-    items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-    items <- trimws(items)
-    items <- items[nzchar(items)]
-    items <- gsub("\\*", "", items)
-
-    ## Characteristics index
-    characteristics_index <- logical(length(items))
-    for(i in seq_along(split_content)){
-
-      ## Get locations
-      locations <- grepl(split_content[i], tm::stemDocument(flatten_text(items)))
-
-      ## Update index
-      characteristics_index[locations] <- TRUE
-
-    }
-
-    # Separate characteristics and items
-    characteristics <- rep(
-      trimws(gsub("||.*", "", items))[characteristics_index],
-      each = 2
-    )
-    items <- trimws(gsub(".*||", "", items))
-
-    # Return items and characteristics
-    return(list(characteristics = characteristics, items = items))
-
-  }
-
-  mixtral_format_p <- function(response, split_content)
-  {
-
-    ## Clean the response so only the items are retained
-    items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-    items <- trimws(items)
-    items <- items[nzchar(items)]
-    items <- gsub("\\*", "", items)
-
-    ## Characteristics index
-    characteristics_index <- tm::stemDocument(flatten_text(items)) %in% split_content
-
-    ## Get characteristics
-    characteristics <- items[characteristics_index]
-    items <- items[!characteristics_index]
-
-    # Separate characteristics and items
-    characteristics <- rep(trimws(gsub("||.*", "", characteristics)), each = 2)
-    items <- gsub("\\-", "", items)
-    items <- trimws(gsub(".*||", "", items))
-
-    # Return items and characteristics
-    return(list(characteristics = characteristics, items = items))
-
-  }
-
-  try_formats_p <- function(response, split_content)
-  {
-    # Try DeepSeek first
-    deepseek <- deepseek_format_p(response, split_content)
-
-    ## Set items and characteristics
-    items <- deepseek$items
-    characteristics <- deepseek$characteristics
-
-    ## Update stems
-    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-    stemmed_items <- tm::stemDocument(flatten_text(items))
-
-    # Check for errors in generation
-    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-      any(stemmed_items %in% split_content) ||
-      length(characteristics) != length(items)
-
-    # If DeepSeek parsing works, return it
-    if(!formatting_issue){
-      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-    }
-
-    # If DeepSeek fails, fall back to existing formats
-    # Try Gemma:
-    gemma <- gemma_format_p(response, split_content)
-    items <- gemma$items
-    characteristics <- gemma$characteristics
-    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-    stemmed_items <- tm::stemDocument(flatten_text(items))
-
-    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-      any(stemmed_items %in% split_content) ||
-      length(characteristics) != length(items)
-
-    if(!formatting_issue){
-      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-    }
-
-    # Try Mixtral:
-    mixtral <- mixtral_format_p(response, split_content)
-    items <- mixtral$items
-    characteristics <- mixtral$characteristics
-    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-    stemmed_items <- tm::stemDocument(flatten_text(items))
-
-    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-      any(stemmed_items %in% split_content) ||
-      length(characteristics) != length(items)
-
-    if(!formatting_issue){
-      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-    }
-
-    # Try LLAMA-3:
-    llama <- llama_format_p(response, split_content)
-    items <- llama$items
-    characteristics <- llama$characteristics
-    stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-    stemmed_items <- tm::stemDocument(flatten_text(items))
-
-    formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-      any(stemmed_items %in% split_content) ||
-      length(characteristics) != length(items)
-
-    if(!formatting_issue){
-      return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-    }
-
-    # Return empty list if nothing worked
-    return(list(stemmed_characteristics = NA, items = NA))
-  }
-
-
   # Attempt to use try_formats for robust cleaning.
-  formats <- try_formats_p(response, split_content)
+  formats <- try_formats(response, split_content)
   new_items <- NULL
 
   if (!is.null(formats$items) && !any(is.na(formats$items)) && length(formats$items) > 0) {

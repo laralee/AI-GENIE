@@ -965,9 +965,9 @@ build_prompts <- function(scale.title, subject, audience,
         ]
 
         if (nrow(subset_rows) > 0) {
-          # Format each example as "item||answer"
+          # Format each example as "item@answer"
           examples_str <- paste(apply(subset_rows, 1, function(row) {
-            paste0(trimws(row["item"]), "||", trimws(row["answer"]))
+            paste0(trimws(row["item"]), "@", trimws(row["answer"]))
           }), collapse = "\n")
           # Prepend a newline so the examples appear clearly separated.
           examples_str <- paste0("\n", examples_str)
@@ -1010,7 +1010,7 @@ build_prompts <- function(scale.title, subject, audience,
 #' @param system.role A character string specifying the system role for the LLM. If NULL, a generic system role is used.
 #' @param custom Logical; if TRUE, user-supplied prompts and cleaning function are used.
 #' @param cleaner_fun A cleaning function to parse the LLM output. In default mode, this should be \code{cleaner_fun_p}.
-#' @param adaptive Logical; if TRUE, previously generated items are included in subsequent API calls.
+#' @param adaptive Logical; if TRUE, previously generated items (from the same category-attribute-difficulty group) are included in subsequent API calls.
 #' @param model A character string specifying the language model to use.
 #' @param temperature Numeric; the model's temperature (range: 0–2).
 #' @param top.p Numeric; the model's top-p sampling parameter (range: 0–1).
@@ -1023,7 +1023,6 @@ build_prompts <- function(scale.title, subject, audience,
 generate.items.internal.p <- function(prompts, target.N, system.role, custom = FALSE, cleaner_fun = cleaner_fun_p,
                                       adaptive = FALSE,
                                       model, temperature, top.p, groq.API, openai.API, silently = FALSE, ...) {
-
   # --- Model Switching ---
   model <- switch(
     model,
@@ -1068,9 +1067,12 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
     call_params <- list(
       model = model,
       messages = messages_list,
-      temperature = temperature,
-      top_p = top.p
+      temperature = temperature
     )
+    # Only include top_p if model supports it
+    if (!grepl("o1", model) && !grepl("o3", model)) {
+      call_params$top_p <- top.p
+    }
     call_params[[completion_param]] <- completion_value
     do.call(generate_FUN, call_params)
   }
@@ -1082,20 +1084,19 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
                          difficulty = character(),
                          stringsAsFactors = FALSE)
 
-  # Iterate over each item type
+  # Iterate over each item type (category)
   for (cat in names(prompts)) {
     if (!silently) {
-      cat(paste("Generating items for", cat, "...\n"))
+      cat(sprintf("Generating items for %s...\n", cat))
       flush.console()
     }
-
     target_N_cat <- target.N[[cat]]
 
-    # Iterate over each attribute
+    # Iterate over each attribute within the category
     for (att in names(prompts[[cat]])) {
       target_N_att <- target_N_cat[[att]]
 
-      # Iterate over each difficulty level
+      # Iterate over each difficulty level for this attribute
       for (diff in names(prompts[[cat]][[att]])) {
         target_N_val <- target_N_att[[diff]]
         prompt <- prompts[[cat]][[att]][[diff]]
@@ -1110,16 +1111,20 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
         error_count <- 0
         consecutive_no_new_items <- 0
         max_consecutive_errors <- 10
+        max_sample_size <- 50  # adaptive sampling limit
 
-        # Generation loop for a given category-att-diff group
         while (length(unique_items) < target_N_val) {
           response <- tryCatch({
-            # Adaptive prompting: include only items from the current group.
+            # Adaptive prompting: include only items from current category-attribute-difficulty group.
             if (adaptive && length(unique_items) > 0) {
-              max_sample_size <- 50  # Adjust based on context window
               sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
               previous_items_text <- paste(sampled_items, collapse = "\n")
-              constructed_content <- paste0(prompt, "\nDo NOT repeat or rephrase any items from the following list:\n", previous_items_text, "\n")
+              constructed_content <- paste0(
+                prompt,
+                "\nDo NOT repeat or rephrase any items from the following list:\n",
+                previous_items_text,
+                "\n"
+              )
             } else {
               constructed_content <- prompt
             }
@@ -1132,8 +1137,7 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
             R.utils::withTimeout({
               call_generate_FUN(messages_list)
             }, timeout = 20, onTimeout = "error")
-          },
-          error = function(e) {
+          }, error = function(e) {
             error_count <<- error_count + 1
             if (error_count >= max_consecutive_errors) {
               if (!silently) {
@@ -1148,7 +1152,7 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
             consecutive_no_new_items <- consecutive_no_new_items + 1
             if (consecutive_no_new_items >= max_consecutive_errors) {
               if (!silently) {
-                cat(paste("\nNo new items generated for", att, "(", tolower(diff), " difficulty) after multiple attempts.\n"))
+                cat(sprintf("\nNo new items generated for %s ( %s difficulty ) after multiple attempts.\n", att, tolower(diff)))
               }
               break
             }
@@ -1157,21 +1161,19 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
             error_count <- 0
           }
 
-          # Clean the API response using the cleaning function
-          current_items <- items_df_temp
+          Sys.sleep(runif(1, min = 1, max = 3))
+
           cleaned_items <- tryCatch({
-            cleaner_fun(response, split_content = NULL, current_items = current_items,
+            cleaner_fun(response, split_content = NULL, current_items = items_df_temp,
                         current_label = cat, attribute = att, difficulty = diff)
           }, error = function(e) {
             if (!silently) {
-              cat("\nError during cleaning:", conditionMessage(e), "\n")
+              cat("\nError during cleaning: ", conditionMessage(e), "\n")
             }
-            return(current_items)
+            return(items_df_temp)
           })
 
-          # Deduplicate: only new statements
           new_unique_items <- setdiff(cleaned_items$statement, unique_items)
-
           if (length(new_unique_items) == 0) {
             consecutive_no_new_items <- consecutive_no_new_items + 1
           } else {
@@ -1181,22 +1183,17 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
 
           items_df_temp <- cleaned_items
 
-          # Simplified console output: show attribute and difficulty info
           if (!silently) {
             cat(sprintf("\rItems generated for %s (%s difficulty): %d", att, tolower(diff), length(unique_items)))
             flush.console()
           }
-        } # End while loop
+        }  # End while loop
 
-        # Append generated items for this group to the overall data frame
         items_df <- rbind(items_df, items_df_temp)
-
-        if (!silently) {
-          cat("\n")
-        }
-      } # End difficulty loop
-    } # End attribute loop
-  } # End category loop
+        if (!silently) { cat("\n") }
+      }  # End difficulty loop
+    }  # End attribute loop
+  }  # End category loop
 
   # --- Post-processing and Finalization ---
   items_df$statement <- trimws(items_df$statement)
@@ -1208,7 +1205,7 @@ generate.items.internal.p <- function(prompts, target.N, system.role, custom = F
   rownames(items_df) <- NULL
 
   if (!silently) {
-    cat(paste0("\nAll items generated. Final sample size: ", nrow(items_df), "\n"))
+    cat(sprintf("\nAll items generated. Final sample size: %d\n", nrow(items_df)))
   }
 
   return(items_df)
