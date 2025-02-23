@@ -48,7 +48,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
       current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic." ,
       "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
-      "\nFOLLOW this format EXACTLY for each item:\n<characteristic>: <item content>",
+      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>> <item content>",
       "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
       "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
     )
@@ -169,12 +169,13 @@ deepseek_format <- function(response, split_content) {
   # Remove empty lines
   items <- items[nzchar(items)]
 
-  # Filter only properly formatted items (e.g., "trait: statement")
-  items <- items[grepl("^[a-zA-Z]+: ", items)]
+  # Filter only properly formatted items (e.g., "trait<<<DELIM>>>  statement")
+  items <- items[grepl("^[a-zA-Z]+<<<DELIM>>> ", items)]
 
   # Separate characteristics and item statements
-  characteristics <- trimws(gsub(":.*", "", items))
-  items <- trimws(gsub(".*: ", "", items))
+  characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
+
 
   # Return extracted items
   return(list(characteristics = characteristics, items = items))
@@ -198,8 +199,8 @@ gemma_format <- function(response, split_content)
   items <- gsub("\\*", "", items)
 
   # Separate characteristics and items
-  characteristics <- trimws(gsub(":.*", "", items))
-  items <- trimws(gsub(".*: ", "", items))
+  characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -230,9 +231,9 @@ mixtral_format <- function(response, split_content)
   items <- items[!characteristics_index]
 
   # Separate characteristics and items
-  characteristics <- rep(trimws(gsub(":.*", "", characteristics)), each = 2)
+  characteristics <- rep(trimws(gsub("<<<DELIM>>>.*", "", characteristics)), each = 2)
   items <- gsub("\\-", "", items)
-  items <- trimws(gsub(".*: ", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -270,10 +271,10 @@ llama_format <- function(response, split_content)
 
   # Separate characteristics and items
   characteristics <- rep(
-    trimws(gsub(":.*", "", items))[characteristics_index],
+    trimws(gsub("<<<DELIM>>>.*", "", items))[characteristics_index],
     each = 2
   )
-  items <- trimws(gsub(".*: ", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
