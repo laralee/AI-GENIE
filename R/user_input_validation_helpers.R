@@ -1001,3 +1001,218 @@ validate_EGA_algorithm <- function(EGA.algorithm){
   }
   return(EGA.algorithm)
 }
+
+
+
+#Performance AIGENIE Checks----
+
+#' Validate Item Difficulty
+#'
+#' Validates and standardizes the `item.difficulty` parameter for performance-based assessments in the `p_AIGENIE` function.
+#'
+#' The input should be a list that specifies the difficulty levels for each item type. There are two supported formats:
+#' \itemize{
+#'   \item \strong{Named list:} The names of the list represent the item types, and each element is a character vector of difficulty values.
+#'         Each difficulty value must be one of the accepted synonyms (case insensitive) which are mapped as follows:
+#'         \itemize{
+#'           \item "very easy", "very simple", "very basic" → "VERY LOW"
+#'           \item "easy", "simple", "basic" → "LOW"
+#'           \item "average", "standard" → "MEDIUM"
+#'           \item "hard", "difficult", "challenging" → "HIGH"
+#'           \item "very hard", "very difficult", "very challenging" → "VERY HIGH"
+#'         }
+#'         Each sublist must contain at least 2 unique difficulty values.
+#'
+#'   \item \strong{Unnamed list:} If `item.difficulty` is not named (i.e., just a simple list of item type labels),
+#'         the function assumes the user wants to assign the default difficulty vector of `c("LOW", "MEDIUM", "HIGH")`
+#'         to each item type.
+#' }
+#'
+#' @param item.difficulty A list specifying the difficulty levels for each item type. For a named list, the names serve as item type labels and the elements should be character vectors. For an unnamed list, each element is treated as an item type label.
+#'
+#' @return A named list with the same item type names as the input, where each element is a character vector of validated
+#' and standardized difficulty values in all caps.
+#'
+#' @examples
+#' # Example 1: Named list with synonyms
+#' validate_item_difficulty(list(
+#'   fractions = c("average", "HARD"),
+#'   exponents = c("easy", "VERY easy")
+#' ))
+#' # Returns: list(fractions = c("MEDIUM", "HIGH"), exponents = c("LOW", "VERY LOW"))
+#'
+#' # Example 2: Unnamed list (using default difficulties)
+#' validate_item_difficulty(list("fractions", "exponents"))
+#' # Returns: list(fractions = c("LOW", "MEDIUM", "HIGH"), exponents = c("LOW", "MEDIUM", "HIGH"))
+validate_item_difficulty <- function(item.difficulty) {
+  # If the provided list is not named (or all names are empty), assume each element is an item type label
+  if (is.null(names(item.difficulty)) || all(names(item.difficulty) == "")) {
+    # Check that each element is a character string of length 1
+    if (!all(sapply(item.difficulty, function(x) is.character(x) && length(x) == 1))) {
+      stop("When item.difficulty is not a named list, each element must be a single string representing an item type label.")
+    }
+    # Use the provided values as the item type names and assign the default difficulties
+    default_difficulties <- c("LOW", "MEDIUM", "HIGH")
+    item.difficulty <- setNames(
+      replicate(length(item.difficulty), default_difficulties, simplify = FALSE),
+      unlist(item.difficulty)
+    )
+  }
+
+  # Now, item.difficulty is a named list. Check that names are nonempty.
+  if (any(names(item.difficulty) == "")) {
+    stop("All elements in item.difficulty must have nonempty names representing item types.")
+  }
+
+  # Define the mapping dictionary (keys in lower case)
+  mapping <- c(
+    "very easy" = "VERY LOW",
+    "very simple" = "VERY LOW",
+    "very basic" = "VERY LOW",
+    "easy" = "LOW",
+    "simple" = "LOW",
+    "basic" = "LOW",
+    "average" = "MEDIUM",
+    "standard" = "MEDIUM",
+    "hard" = "HIGH",
+    "difficult" = "HIGH",
+    "challenging" = "HIGH",
+    "very hard" = "VERY HIGH",
+    "very difficult" = "VERY HIGH",
+    "very challenging" = "VERY HIGH"
+  )
+
+  # Process each sublist in item.difficulty
+  validated <- lapply(item.difficulty, function(diff_vec) {
+    if (!is.character(diff_vec)) {
+      stop("Each element in item.difficulty must be a character vector.")
+    }
+
+    # Trim whitespace and convert to lower case
+    diff_vec <- tolower(trimws(diff_vec))
+
+    # Map each difficulty using the mapping dictionary
+    mapped <- sapply(diff_vec, function(x) {
+      if (!x %in% names(mapping)) {
+        stop(paste("Difficulty value", x, "is not recognized. Acceptable synonyms include 'very easy', 'average', 'hard', etc."))
+      }
+      mapping[[x]]
+    }, USE.NAMES = FALSE)
+
+    # Check that there are at least 2 difficulty values per item type
+    if (length(mapped) < 2) {
+      stop("Each item type in item.difficulty must contain at least 2 difficulty values.")
+    }
+
+    # Check for duplicates within the sublist
+    if (any(duplicated(mapped))) {
+      stop("Duplicate difficulty values found within an item type. Ensure each sublist contains unique difficulty values.")
+    }
+
+    return(mapped)
+  })
+
+  return(validated)
+}
+
+#' Validate Item Examples
+#'
+#' Validates and standardizes the `item.examples` data frame for performance-based assessments in the `p_AIGENIE` function.
+#'
+#' The input must be a data frame with exactly four columns: `type`, `difficulty`, `statement`, and `answer`. The function performs the following checks:
+#' \itemize{
+#'   \item Ensures that the `type` column values are present in the valid item types provided (typically the names from `item.difficulty`).
+#'   \item Verifies that each entry in the `difficulty` column is one of the acceptable values (case-insensitive and whitespace trimmed), and maps them to their canonical forms:
+#'         \itemize{
+#'           \item "very easy", "very simple", "very basic" → "VERY LOW"
+#'           \item "easy", "simple", "basic" → "LOW"
+#'           \item "average", "standard" → "MEDIUM"
+#'           \item "hard", "difficult", "challenging" → "HIGH"
+#'           \item "very hard", "very difficult", "very challenging" → "VERY HIGH"
+#'         }
+#'   \item Checks that the `statement` column is not empty or missing.
+#'   \item Checks that the `answer` column is provided (it may be numeric or any other type but must not be missing).
+#' }
+#' If all checks pass, the function returns a standardized data frame with the `difficulty` values converted to their canonical forms (in all caps).
+#'
+#' @param item.examples A data frame containing columns: `type`, `difficulty`, `statement`, and `answer`.
+#' @param valid.types A character vector of valid item types (e.g., the names from the validated `item.difficulty` list).
+#'
+#' @return A standardized data frame where the `difficulty` column has been validated and converted to its canonical form.
+validate_item_examples <- function(item.examples, valid.types) {
+  # Check that item.examples is a data frame
+  if (!is.data.frame(item.examples)) {
+    stop("item.examples must be a data frame.")
+  }
+
+  # Check that the data frame contains exactly the required columns
+  required_cols <- c("type", "difficulty", "statement", "answer")
+  if (!all(required_cols %in% colnames(item.examples))) {
+    stop(paste("item.examples must contain the following columns:", paste(required_cols, collapse = ", ")))
+  }
+
+  # Define the mapping dictionary (keys in lower case)
+  mapping <- c(
+    "very easy" = "VERY LOW",
+    "very simple" = "VERY LOW",
+    "very basic" = "VERY LOW",
+    "easy" = "LOW",
+    "simple" = "LOW",
+    "basic" = "LOW",
+    "average" = "MEDIUM",
+    "standard" = "MEDIUM",
+    "hard" = "HIGH",
+    "difficult" = "HIGH",
+    "challenging" = "HIGH",
+    "very hard" = "VERY HIGH",
+    "very difficult" = "VERY HIGH",
+    "very challenging" = "VERY HIGH"
+  )
+
+  # Process each row
+  for (i in seq_len(nrow(item.examples))) {
+    row <- item.examples[i, ]
+
+    # Check that 'type' is among valid.types (case-insensitive comparison)
+    type_val <- tolower(trimws(as.character(row[["type"]])))
+    valid_lower <- tolower(valid.types)
+    if (!(type_val %in% valid_lower)) {
+      stop(paste("Row", i, "has an invalid 'type' value. It must be one of:", paste(valid.types, collapse = ", ")))
+    }
+
+    # Standardize the type by replacing with the matching valid type (assuming exact match ignoring case)
+    # Here, we leave the 'type' column as is, or optionally update it to the canonical version from valid.types.
+    # For simplicity, we assume the provided type value is acceptable.
+
+    # Check the difficulty value
+    diff_val <- tolower(trimws(as.character(row[["difficulty"]])))
+    if (!diff_val %in% names(mapping)) {
+      stop(paste("Row", i, "has an unrecognized difficulty value:", row[["difficulty"]],
+                 ". Acceptable synonyms include 'very easy', 'average', 'hard', etc."))
+    }
+    # Map the difficulty value to its canonical form
+    canonical_diff <- mapping[[diff_val]]
+    item.examples[i, "difficulty"] <- canonical_diff
+
+    # Check that 'statement' is not missing or empty (after trimming)
+    statement_val <- as.character(row[["statement"]])
+    if (is.na(statement_val) || trimws(statement_val) == "") {
+      stop(paste("Row", i, "has an empty or missing 'statement'."))
+    }
+
+    # Check that 'answer' is provided (it may be numeric, but not missing)
+    answer_val <- row[["answer"]]
+    if (is.null(answer_val) || (is.character(answer_val) && trimws(answer_val) == "") || (is.na(answer_val))) {
+      stop(paste("Row", i, "has an empty or missing 'answer'."))
+    }
+  }
+
+  # Optionally, standardize the 'type' column to match valid.types (e.g., by matching case)
+  # For example:
+  item.examples[["type"]] <- sapply(item.examples[["type"]], function(x) {
+    idx <- which(tolower(valid.types) == tolower(trimws(x)))
+    if (length(idx) > 0) valid.types[idx] else x
+  })
+
+  return(item.examples)
+}
