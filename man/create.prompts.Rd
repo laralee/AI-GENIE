@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils_helpers.R
 \name{create.prompts}
 \alias{create.prompts}
-\title{Create Prompts}
+\title{Create Prompts for Item Generation}
 \usage{
 create.prompts(
   item.attributes,
@@ -10,29 +10,70 @@ create.prompts(
   scale.title,
   sub.domain,
   item.examples,
-  system.role
+  system.role,
+  performance = FALSE,
+  audience = NULL,
+  validated_difficulty = NULL
 )
 }
 \arguments{
-\item{item.attributes}{A list where each element is a vector of attributes corresponding to each item type.}
+\item{item.attributes}{A named list of item attributes for regular mode. (Ignored in performance mode.)}
 
-\item{item.type.definitions}{An optional named list or data frame providing definitions for each item type. Each definition should be a character string not exceeding 250 characters. This helps the language model understand the item types better. Definitions are included at the beginning of the prompts for their corresponding item types.}
+\item{item.type.definitions}{An optional named list or data frame of definitions for each item type.}
 
-\item{scale.title}{An optional character string specifying the name of your inventory.}
+\item{scale.title}{An optional character string specifying the title of the scale.}
 
-\item{sub.domain}{An optional character string specifying the inventory's sub-domain or specialty.}
+\item{sub.domain}{An optional character string specifying the sub-domain or subject area.}
 
-\item{item.examples}{An optional character vector of example item strings.}
+\item{item.examples}{In regular mode, a character vector of example items. In performance mode, a data frame
+with columns \code{type}, \code{difficulty}, \code{statement}, and \code{answer}.}
 
-\item{system.role}{An optional character string describing the language model's role.}
+\item{system.role}{An optional character string describing the role the language model should assume.}
+
+\item{performance}{Logical; if TRUE, constructs prompts for performance-based item generation. Defaults to FALSE.}
+
+\item{audience}{In performance mode, an optional non-empty string describing the intended audience.}
+
+\item{validated_difficulty}{In performance mode, a named list of validated difficulty values for each item type.}
 }
 \value{
 A list containing:
-\describe{
-\item{\code{user.prompts}}{A list of user prompts for each item type to instruct the language model.}
-\item{\code{system.role}}{A character string for the system role prompt.}
+\itemize{
+\item \code{user.prompts}: A named list of user prompts, one per item type.
+\item \code{system.role}: A character string for the system role prompt.
 }
+
+In performance mode, the prompt incorporates any provided item type definition, detailed formatting instructions,
+a reminder that each item must be separated by a newline, and formatted examples (if available). In regular mode, the
+function behaves as in the original AI-GENIE pipeline.
 }
 \description{
-Generates user prompts and a system role prompt for item generation based on provided item types, attributes, scale title, sub-domain, and optional item examples.
+Generates user prompts and a system role prompt for item generation, supporting two modes:
+regular (self-report) items and performance-based assessment items. The mode is determined by
+the logical parameter \code{performance}.
+}
+\details{
+In regular mode (\code{performance = FALSE}), the function constructs prompts using the provided
+\code{item.attributes}, \code{item.type.definitions}, and \code{item.examples} (a character vector), following the
+established format for the AI-GENIE pipeline.
+
+In performance mode (\code{performance = TRUE}), the function expects:
+\itemize{
+\item \code{validated_difficulty}: a named list of canonical difficulty levels (e.g., \code{c("LOW", "MEDIUM", "HIGH")}
+or other accepted values) for each item type.
+\item \code{item.examples}: a data frame with columns \code{type}, \code{difficulty}, \code{statement}, and \code{answer}.
+}
+
+In performance mode, the constructed main prompt instructs the language model to generate items that assess
+ability level. The prompt includes:
+\itemize{
+\item The item type definition (if available) for the current item type.
+\item Detailed instructions specifying that each item must be separated by a newline (\verb|\n|).
+\item A requirement to generate exactly three items per ability level using the following format:
+\cr \verb|\if{html}{\out{<item statement>}}<\if{html}{\out{<DELIM>}}> \if{html}{\out{<answer>}}<\if{html}{\out{<DELIM>}}> \if{html}{\out{<difficulty level>}}|,
+where the \verb{<difficulty level>} is one of the canonical values (e.g., "LOW", "MEDIUM", "HIGH").
+\item If examples are provided, the function extracts rows from the examples data frame corresponding to the
+current item type, formats each row using the specified template, and appends them (each on a new line)
+to the prompt.
+}
 }

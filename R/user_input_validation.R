@@ -227,68 +227,40 @@ GENIE_checks <- function(item.data, openai.API, EGA.model,EGA.algorithm, embeddi
 
 
 #AI GENIE Custom----
-#' Validate Return Object from Cleaning Function (List Version)
+#' Validate Return Object from Cleaning Function
 #'
-#' Validates the output of the user-provided text cleaning function (\code{cleaning.fun}) to ensure it returns a list of cleaned items. This function checks that the output is a list of character strings, contains no missing or empty values, and correctly formats the item data by associating each item with its corresponding type.
+#' Validates the output of a user-provided text cleaning function. When in self-report mode
+#' (performance = FALSE), the output must be a data frame with the required columns (e.g., "item" and "type").
+#' When in performance mode (performance = TRUE), the output must be a data frame containing exactly the following columns:
+#' "statement", "answer", "difficulty", and "type". An error is thrown if any required columns are missing.
 #'
-#' @param output The output object returned by the user-provided \code{cleaning.fun} function.
-#' @param n_empty The number of times the cleaning function failed to return any valid items
-#' @param item_attributes A named list containing item type labels and their corresponding attributes.
-#' @return A list containing the character vector of cleaned item statements, the character vector containing the cleaned item attributes, and the number of items the cleaning function failed to return viable output consecutively.
-validate_return_object <- function(output, n_empty, item_attributes) {
+#' @param output The output object returned by the user-provided cleaning function.
+#' @param n_empty The number of consecutive times the cleaning function failed to return any valid items.
+#' @param item_attributes A named list of item attribute/difficulty information.
+#' @param performance Logical; if TRUE, indicates that performance item processing is in effect.
+#'
+#' @return The validated output data frame.
+validate_return_object <- function(output, n_empty, item_attributes, performance = FALSE) {
   string <- "output of the provided text cleaning function"
 
-  # Check if output is a data frame
   if (!is.data.frame(output)) {
-    stop(paste("The", string, "must be a data frame of cleaned items."))
+    stop(paste("The", string, "must be a data frame."))
   }
 
-  if(ncol(output) != 2 || !("item" %in% colnames(output)) || !("attribute" %in% colnames(output))) {
-    stop(paste("The", string, "must be a data frame with two columns: one named `item` and one named `attribute`."))
+  if (performance) {
+    # In performance mode, expect four columns: "statement", "answer", "difficulty", and "type".
+    required_cols <- c("statement", "answer", "difficulty", "type")
+  } else {
+    # In self-report mode, expect at least "item" and "type".
+    required_cols <- c("item", "type")
   }
 
-
-  # Ensure all elements in the data frame are character strings
-  if (!all(sapply(output$item, is.character)) || !all(sapply(output$attribute, is.character))) {
-    stop(paste("All cells in the", string, "must be character strings."))
+  missing_cols <- setdiff(required_cols, colnames(output))
+  if (length(missing_cols) > 0) {
+    stop(paste("The", string, "is missing the following required column(s):", paste(missing_cols, collapse = ", ")))
   }
 
-  # Identify and clean the item attributes
-  found_item_attributes <- output$attribute
-  stemmed_found_attributes <- tm::stemDocument(trimws(tolower(gsub("[[:punct:]]", "", found_item_attributes))))
-  names(item_attributes) <- NULL
-  item_attributes <- unlist(item_attributes)
-  item_attributes <- trimws(tolower(gsub("[[:punct:]]", "", item_attributes)))
-  stemmed_attributes <- tm::stemDocument(item_attributes)
-
-  valid_indices <- c()
-  for(i in seq_len(nrow(output))){
-    item <- output$item[[i]]
-    attribute <- stemmed_found_attributes[[i]]
-
-    if(attribute %in% stemmed_attributes && !is.null(item) && !is.na(item) && item != ""){
-      valid_indices <- c(valid_indices, i)
-    }
-  }
-
-  # Flatten the list into a character vector
-  items <- unlist(output$item[valid_indices])
-
-  if (length(items) == 0 && n_empty < 50) {
-    n_empty <- n_empty + 1
-  } else if (length(items) > 0){
-    n_empty <- 0
-  }
-
-  if (n_empty >= 50){
-    stop("No valid items were returned by the cleaning function after 50 consecutive attempts. Check function logic.")
-  }
-
-
-  items <- output$item[valid_indices]
-  item_attributes <- stemmed_found_attributes[valid_indices]
-
-  return(list(items=items, item_attributes=item_attributes, n_empty=n_empty))
+  return(output)
 }
 
 
@@ -351,3 +323,167 @@ validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, mo
 
   return(list(openai.API=openai.API, groq.API=groq.API, user.prompts=user.prompts, model=model, system.role=system.role))
 }
+
+
+#Performance AI-GENIE ----
+
+#' p_AIGENIE Input Validation (Internal)
+#'
+#' Validates and processes the input parameters for the p_AIGENIE function, which is designed for generating
+#' performance or ability-based assessment items (e.g., math items). This function mirrors the behavior of AIGENIE_checks
+#' but replaces item.attributes with item.difficulty and expects item.examples to be a data frame with columns:
+#' type, difficulty, statement, and answer. Additionally, the new parameter audience (if provided) is validated as a non-empty string.
+#'
+#' The validations performed include:
+#' - item.difficulty: Must be either a named list or an unnamed list. For an unnamed list, each element is assumed to be
+#'   an item type label and the default difficulty vector (c("LOW", "MEDIUM", "HIGH")) is assigned. For a named list,
+#'   each element must be a character vector of difficulty values (synonyms are allowed) which are mapped to their canonical
+#'   all-caps forms. Each sublist must contain at least 2 unique values.
+#' - item.examples: If provided, it must be a data frame with columns type, difficulty, statement, and answer. The type
+#'   values must be among the valid item types (i.e., the names from item.difficulty), and the difficulty values are mapped
+#'   to their canonical forms.
+#' - audience: If provided, must be a non-empty string describing the intended audience of the scale.
+#' - All other parameters (openai.API, groq.API, system.role, scale.title, sub.domain, model, etc.) are validated using
+#'   the existing helper functions.
+#'
+#' @param item.difficulty A list specifying difficulty levels for each item type.
+#' @param openai.API A character string of your OpenAI API key.
+#' @param groq.API A character string of your Groq API key.
+#' @param custom A boolean indicating whether custom prompts and a cleaning function are used.
+#' @param user.prompts A named list of custom prompt strings (required if custom is TRUE).
+#' @param item.type.definitions An optional named list or data frame with definitions for each item type.
+#' @param cleaning.fun A function to clean and parse the language model's output (required if custom is TRUE).
+#' @param system.role A character string describing the role the language model should assume.
+#' @param scale.title A character string specifying the scale's title.
+#' @param audience (Optional) A non-empty string describing the intended audience.
+#' @param sub.domain A character string specifying the sub-domain or specialty.
+#' @param model A character string specifying the language model to use.
+#' @param item.examples An optional data frame with columns type, difficulty, statement, and answer.
+#' @param target.N An integer or vector of integers specifying the target number of items to generate.
+#' @param temperature A numeric value controlling the randomness of the language model's output.
+#' @param top.p A numeric value controlling the diversity of the language model's output.
+#' @param items.only A boolean indicating whether only items are generated without further analysis.
+#' @param adaptive A boolean indicating whether previously generated items are incorporated into subsequent prompts.
+#' @param EGA.model An optional character string specifying the EGA model to use.
+#' @param EGA.algorithm A character string specifying the clustering algorithm for EGA.
+#' @param embedding.model A character string specifying the OpenAI embedding model.
+#' @param keep.org A boolean indicating whether the original generated item pool and embeddings are retained.
+#' @param plot A boolean indicating whether to generate network plots.
+#' @param plot.stability A boolean indicating whether to generate additional stability plots.
+#' @param calc.final.stability A boolean indicating whether to compute bootstrapped stability measures.
+#' @param silently A boolean indicating whether to suppress console output.
+#'
+#' @return A list of validated parameters ready for use in p_AIGENIE.
+p_AIGENIE_checks <- function(item.difficulty, openai.API, groq.API, custom, user.prompts,
+                             item.type.definitions, cleaning.fun, system.role, scale.title, audience,
+                             sub.domain, model, item.examples, target.N, temperature, top.p,
+                             items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
+                             keep.org, plot, plot.stability, calc.final.stability, silently) {
+
+  # Check that none of the essential parameters are NA
+  check_no_na(item.difficulty, openai.API, groq.API, custom, user.prompts,
+              item.type.definitions, cleaning.fun, system.role, scale.title, audience, sub.domain, model,
+              item.examples, target.N, temperature, top.p, items.only, adaptive, EGA.model, EGA.algorithm,
+              embedding.model, keep.org, plot, plot.stability, calc.final.stability, silently)
+
+  # Validate boolean parameters
+  bool_params <- list(custom = custom, items.only = items.only, adaptive = adaptive,
+                      keep.org = keep.org, plot = plot, plot.stability = plot.stability,
+                      calc.final.stability = calc.final.stability, silently = silently)
+  for (param in names(bool_params)) {
+    if (!is.logical(bool_params[[param]]) || length(bool_params[[param]]) != 1) {
+      stop(paste0("'", param, "' must be a single boolean value."))
+    }
+  }
+
+  # Validate audience if provided: it must be a non-empty string
+  if (!is.null(audience)) {
+    if (!is.character(audience) || length(audience) != 1 || trimws(audience) == "") {
+      stop("If provided, 'audience' must be a non-empty string describing the intended audience of the scale.")
+    }
+    audience <- trimws(audience)
+  }
+
+  # Validate system.role, scale.title, and sub.domain
+  system.role <- validate_system_role(system.role)
+  scale.title <- validate_title_or_domain(scale.title, "scale title")
+  sub.domain <- validate_title_or_domain(sub.domain, "sub domain")
+
+  # Validate item.difficulty using our custom helper
+  validated_difficulty <- validate_item_difficulty(item.difficulty)
+
+  # Determine valid item types from item.difficulty (the names)
+  labels <- names(validated_difficulty)
+
+  # Custom mode validations
+  if (custom) {
+    user.prompts <- validate_user_prompts(user.prompts)
+    if (!is.function(cleaning.fun)) {
+      stop("When 'custom' is TRUE, 'cleaning.fun' must be a function.")
+    }
+    labels <- names(user.prompts)
+  }
+
+  # Validate item.type.definitions (if provided)
+  item.type.definitions <- validate_item_type_definitions(item.type.definitions, labels)
+
+  # Validate model
+  model <- validate_model(model, silently)
+
+  # Validate item.examples if provided (for performance items, it must be a data frame)
+  if (!is.null(item.examples)) {
+    item.examples <- validate_item_examples(item.examples, valid.types = labels)
+  }
+
+  # Validate target.N using the valid labels
+  target.N <- validate_target_N(target.N, labels, items.only)
+
+  # Validate API keys
+  api_keys <- validate_api_keys(openai.API, groq.API, model)
+  openai.API <- api_keys$openai.API
+  groq.API <- api_keys$groq.API
+
+  # Validate temperature and top.p
+  params <- validate_temperature_top.p(temperature, top.p)
+  temperature <- params$temperature
+  top.p <- params$top.p
+
+  # Validate custom flag further
+  custom <- validate_custom(custom, item.difficulty, user.prompts, cleaning.fun)
+
+  # Validate embedding.model
+  embedding.model <- validate_embedding(embedding.model)
+
+  # Return a list of validated parameters
+  return(list(
+    item.difficulty = validated_difficulty,
+    openai.API = openai.API,
+    groq.API = groq.API,
+    custom = custom,
+    user.prompts = user.prompts,
+    item.type.definitions = item.type.definitions,
+    cleaning.fun = cleaning.fun,
+    system.role = system.role,
+    scale.title = scale.title,
+    audience = audience,
+    sub.domain = sub.domain,
+    model = model,
+    item.examples = item.examples,
+    target.N = target.N,
+    temperature = temperature,
+    top.p = top.p,
+    items.only = items.only,
+    adaptive = adaptive,
+    EGA.model = EGA.model,
+    EGA.algorithm = EGA.algorithm,
+    embedding.model = embedding.model,
+    keep.org = keep.org,
+    plot = plot,
+    plot.stability = plot.stability,
+    calc.final.stability = calc.final.stability,
+    silently = silently
+    ))
+}
+
+
+

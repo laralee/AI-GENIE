@@ -1,60 +1,186 @@
 # AI GENIE Utils Helpers ----
 
-#' Create Prompts
+#' Create Prompts for Item Generation
 #'
-#' Generates user prompts and a system role prompt for item generation based on provided item types, attributes, scale title, sub-domain, and optional item examples.
+#' Generates user prompts and a system role prompt for item generation, supporting two modes:
+#' regular (self-report) items and performance-based assessment items. The mode is determined by
+#' the logical parameter `performance`.
 #'
-#' @param item.attributes A list where each element is a vector of attributes corresponding to each item type.
-#' @param item.type.definitions An optional named list or data frame providing definitions for each item type. Each definition should be a character string not exceeding 250 characters. This helps the language model understand the item types better. Definitions are included at the beginning of the prompts for their corresponding item types.
-#' @param scale.title An optional character string specifying the name of your inventory.
-#' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
-#' @param item.examples An optional character vector of example item strings.
-#' @param system.role An optional character string describing the language model's role.
-#' @return A list containing:
-#' \describe{
-#'   \item{\code{user.prompts}}{A list of user prompts for each item type to instruct the language model.}
-#'   \item{\code{system.role}}{A character string for the system role prompt.}
+#' In regular mode (`performance = FALSE`), the function constructs prompts using the provided
+#' `item.attributes`, `item.type.definitions`, and `item.examples` (a character vector), following the
+#' established format for the AI-GENIE pipeline.
+#'
+#' In performance mode (`performance = TRUE`), the function expects:
+#' \itemize{
+#'   \item `validated_difficulty`: a named list of canonical difficulty levels (e.g., \code{c("LOW", "MEDIUM", "HIGH")}
+#'         or other accepted values) for each item type.
+#'   \item `item.examples`: a data frame with columns \code{type}, \code{difficulty}, \code{statement}, and \code{answer}.
 #' }
+#'
+#' In performance mode, the constructed main prompt instructs the language model to generate items that assess
+#' ability level. The prompt includes:
+#' \itemize{
+#'   \item The item type definition (if available) for the current item type.
+#'   \item Detailed instructions specifying that each item must be separated by a newline (\verb|\n|).
+#'   \item A requirement to generate exactly three items per ability level using the following format:
+#'         \cr \verb|<item statement><<DELIM>> <answer><<DELIM>> <difficulty level>|,
+#'         where the `<difficulty level>` is one of the canonical values (e.g., "LOW", "MEDIUM", "HIGH").
+#'   \item If examples are provided, the function extracts rows from the examples data frame corresponding to the
+#'         current item type, formats each row using the specified template, and appends them (each on a new line)
+#'         to the prompt.
+#' }
+#'
+#' @param item.attributes A named list of item attributes for regular mode. (Ignored in performance mode.)
+#' @param item.type.definitions An optional named list or data frame of definitions for each item type.
+#' @param scale.title An optional character string specifying the title of the scale.
+#' @param sub.domain An optional character string specifying the sub-domain or subject area.
+#' @param item.examples In regular mode, a character vector of example items. In performance mode, a data frame
+#'                      with columns \code{type}, \code{difficulty}, \code{statement}, and \code{answer}.
+#' @param system.role An optional character string describing the role the language model should assume.
+#' @param performance Logical; if TRUE, constructs prompts for performance-based item generation. Defaults to FALSE.
+#' @param audience In performance mode, an optional non-empty string describing the intended audience.
+#' @param validated_difficulty In performance mode, a named list of validated difficulty values for each item type.
+#'
+#' @return A list containing:
+#' \itemize{
+#'   \item \code{user.prompts}: A named list of user prompts, one per item type.
+#'   \item \code{system.role}: A character string for the system role prompt.
+#' }
+#'
+#' In performance mode, the prompt incorporates any provided item type definition, detailed formatting instructions,
+#' a reminder that each item must be separated by a newline, and formatted examples (if available). In regular mode, the
+#' function behaves as in the original AI-GENIE pipeline.
 create.prompts <- function(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                           system.role) {
-  item.types <- names(item.attributes)
+                           system.role, performance = FALSE, audience = NULL, validated_difficulty = NULL) {
 
-  system.role <- create.system.role.prompt(system.role, item.types, scale.title,
-                                           sub.domain, item.examples)
-
-  user.prompts <- list()
-
-  # Create user prompts
-  for (i in seq_along(item.types)) {
-    current_type <- item.types[[i]]
-    attributes <- item.attributes[[current_type]]
-
-    # Build attributes string
-    attr_str <- paste(attributes, collapse = ", ")
-
-    # Retrieve definition if provided
-    definition <- ""
-    if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[current_type]])) {
-      definition <- item.type.definitions[[current_type]]
-      definition <- substr(definition, 1, 250)
-      definition <- paste0("Definition of '", current_type, "': ", definition, "\n")
+  if (performance) {
+    # In performance mode, validated_difficulty must be provided.
+    if (is.null(validated_difficulty)) {
+      stop("For performance mode, validated_difficulty must be provided.")
     }
 
-    # Construct the prompt for all prompts
-    user.prompts[[current_type]] <- paste0(
-      definition,
-      "Generate a total of ", length(attributes) * 2, " UNIQUE, psychometrically reliable and valid ",
-      ifelse(sub.domain != "Networks Before vs After AI-GENIE", sub.domain, "inventory"),
-      " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
-      current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic." ,
-      "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
-      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>> <item content>",
-      "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
-      "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
-    )
-  }
+    # Item types come from validated_difficulty
+    item.types <- names(validated_difficulty)
 
-  return(list(user.prompts = user.prompts, system.role = system.role))
+    # Set a default system role if none provided
+    if (is.null(system.role)) {
+      system.role <- paste0("You are an expert scale developer specializing in writing items for novel inventories that assess ability level",
+                            ifelse(is.null(sub.domain), ".", paste0(" in ", sub.domain, ".")),
+                            ifelse(is.null(audience), "", paste0(" Your items should be appropriate for ", audience, ".")))
+    }
+
+    user.prompts <- list()
+
+    for (i in seq_along(item.types)) {
+      type <- item.types[[i]]
+      difficulties <- validated_difficulty[[type]]  # canonical difficulties (e.g., c("LOW", "MEDIUM", "HIGH") or other)
+
+      # If an item type definition exists, include it.
+      definition <- ""
+      if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[type]])) {
+        definition <- item.type.definitions[[type]]
+        definition <- substr(definition, 1, 250)
+        definition <- paste0("Definition of '", type, "': ", definition, "\n")
+      }
+
+      # Build the examples string if item.examples is provided.
+      examples_str <- ""
+      if (!is.null(item.examples)) {
+        # Subset the data frame rows where the type matches (case-insensitive)
+        ex_rows <- item.examples[tolower(item.examples$type) == tolower(type), ]
+        if (nrow(ex_rows) > 0) {
+          # For each row, format as: <item statement><<DELIM>> <answer><<DELIM>> <difficulty level>
+          formatted_examples <- apply(ex_rows, 1, function(row) {
+            mapping <- c(
+              "very easy" = "VERY LOW",
+              "very simple" = "VERY LOW",
+              "very basic" = "VERY LOW",
+              "easy" = "LOW",
+              "simple" = "LOW",
+              "basic" = "LOW",
+              "average" = "MEDIUM",
+              "standard" = "MEDIUM",
+              "hard" = "HIGH",
+              "difficult" = "HIGH",
+              "challenging" = "HIGH",
+              "very hard" = "VERY HIGH",
+              "very difficult" = "VERY HIGH",
+              "very challenging" = "VERY HIGH"
+            )
+            diff_val <- tolower(trimws(as.character(row["difficulty"])))
+            if (!diff_val %in% names(mapping)) {
+              stop(paste("Example row has unrecognized difficulty value:", row["difficulty"]))
+            }
+            canonical_diff <- mapping[[diff_val]]
+            paste0(trimws(as.character(row["statement"])),
+                   "<<DELIM>> ", trimws(as.character(row["answer"])),
+                   "<<DELIM>> ", canonical_diff)
+          })
+          examples_str <- paste(formatted_examples, collapse = "\n")
+          examples_str <- paste0("\nHere are some examples of well-written items:\n", examples_str)
+        }
+      }
+
+      # Build the main performance prompt.
+      main_prompt <- paste0(
+        definition,
+        "You are creating items for a performance-based scale",
+        ifelse(is.null(scale.title), ".", paste0(" called '", scale.title, "'.")),
+        " As such, these items should assess one’s ability level",
+        ifelse(is.null(sub.domain), ".", paste0(" in the subject of ", sub.domain, ".")),
+        ifelse(is.null(audience), "", paste0(" Design these items for ", audience, ".")),
+        " For now, you will focus on generating items meant to distinguish between ",
+        ifelse(is.null(audience), "users", audience),
+        " who have a ",
+        paste0(difficulties[-length(difficulties)], collapse = " ability level, "),
+        " ability level, and ", difficulties[length(difficulties)], " ability level.",
+        " For now, ONLY generate items pertaining to ", type, ".",
+        " Do NOT create any other item type. Generate EXACTLY three items for EACH ability level.",
+        " Ensure you include the answer to the item as well.",
+        " Each item MUST be separated by a newline (\\n).",
+        " Place EACH item on its own line, and format each item EXACTLY as follows:",
+        " \n<item statement><<DELIM>> <answer><<DELIM>> <difficulty level>\n",
+        " That is, format the item by including the item statement, followed by '<<DELIM>> ',",
+        " followed by the correct answer, followed by '<<DELIM>> ', followed by the difficulty level.",
+        " Do NOT include any additional text or formatting. Do NOT number the output. Do NOT label the items.",
+        " You should ONLY include the properly formatted items.",
+        examples_str
+      )
+
+      user.prompts[[type]] <- main_prompt
+    }
+
+    return(list(user.prompts = user.prompts, system.role = system.role))
+
+  } else {
+    # Regular (self-report) mode remains unchanged.
+    item.types <- names(item.attributes)
+    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples)
+    user.prompts <- list()
+    for (i in seq_along(item.types)) {
+      current_type <- item.types[[i]]
+      attributes <- item.attributes[[current_type]]
+      attr_str <- paste(attributes, collapse = ", ")
+      definition <- ""
+      if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[current_type]])) {
+        definition <- item.type.definitions[[current_type]]
+        definition <- substr(definition, 1, 250)
+        definition <- paste0("Definition of '", current_type, "': ", definition, "\n")
+      }
+      user.prompts[[current_type]] <- paste0(
+        definition,
+        "Generate a total of ", length(attributes) * 2, " UNIQUE, psychometrically reliable and valid ",
+        ifelse(sub.domain != "Networks Before vs After AI-GENIE", sub.domain, "inventory"),
+        " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
+        current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic.",
+        "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
+        "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<DELIM>>> <item content>",
+        "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
+        "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
+      )
+    }
+    return(list(user.prompts = user.prompts, system.role = system.role))
+  }
 }
 
 
@@ -1108,4 +1234,72 @@ clean_EGA_output <- function(ega_obj, item_set) {
     item_set <- item_set[, valid_idx, drop = FALSE]
   }
   list(ega_obj = ega_obj, item_set = item_set)
+}
+
+
+#' Clean Performance Item Output
+#'
+#' Parses and cleans the language model's response for performance-based item generation.
+#'
+#' This function is designed for responses where each item is expected to be formatted as:
+#' \cr \verb|<item statement><<DELIM>> <answer><<DELIM>> <difficulty level>|,
+#' with each item on its own line. The function:
+#' \itemize{
+#'   \item Removes any extraneous text (e.g., enclosed in \verb|<think>...</think>|).
+#'   \item Splits the response into individual lines.
+#'   \item Uses a regular expression to extract exactly three components per line:
+#'         the item statement, the answer, and the difficulty level.
+#'   \item Trims whitespace from each component.
+#' }
+#'
+#' If no valid lines are found or if the parsing fails for a line, the function returns NA values for the
+#' corresponding components.
+#'
+#' @param response A response object from the language model API. It is expected that the text content can
+#'                 be accessed via \code{response$choices[[1]]$message$content}.
+#'
+#' @return A list with three components:
+#' \itemize{
+#'   \item \code{statement}: A character vector of item statements.
+#'   \item \code{answer}: A character vector of answers.
+#'   \item \code{difficulty}: A character vector of difficulty ratings.
+#' }
+#'
+clean_performance_items <- function(response) {
+  # Extract the response content
+  response_text <- response$choices[[1]]$message$content
+
+  # Remove explanatory text enclosed in <think>...</think>
+  response_text <- gsub("<think>.*?</think>", "", response_text, perl = TRUE)
+
+  # Split the response text by newline and trim whitespace
+  lines <- trimws(strsplit(response_text, "\n")[[1]])
+  lines <- lines[nzchar(lines)]
+
+  # Define the pattern: expecting three parts separated by '<<DELIM>>'
+  pattern <- "^(.*)<<DELIM>>\\s*(.*)<<DELIM>>\\s*(.*)$"
+
+  # Filter lines that match the pattern
+  valid_lines <- grep(pattern, lines, value = TRUE)
+
+  if (length(valid_lines) == 0) {
+    return(list(statement = NA, answer = NA, difficulty = NA))
+  }
+
+  # Use regexec and regmatches to extract the three parts
+  parsed <- regexec(pattern, valid_lines)
+  matches <- regmatches(valid_lines, parsed)
+
+  # Ensure each match has exactly 4 elements (the full match plus three capture groups)
+  if (!all(sapply(matches, function(x) length(x) == 4))) {
+    return(list(statement = NA, answer = NA, difficulty = NA))
+  }
+
+  # Extract each component and trim extra whitespace
+  statements <- sapply(matches, function(x) trimws(x[2]))
+  answers <- sapply(matches, function(x) trimws(x[3]))
+  difficulties <- sapply(matches, function(x) trimws(x[4]))
+
+  # Return the results in a list
+  return(list(statement = statements, answer = answers, difficulty = difficulties))
 }

@@ -1,56 +1,62 @@
+
 #' Generate Items Internally
 #'
-#' This internal function drives the item generation process for a personality inventory.
-#' It interacts with a language model API (either OpenAI GPT or a Groq-based model) to produce candidate
-#' items based on provided prompts. Depending on the mode, the function operates as follows:
-#' \itemize{
-#'   \item In default mode (\code{custom = FALSE}), it automatically constructs prompts using the provided
-#'         \code{item.attributes} (and, optionally, \code{item.type.definitions} and \code{item.examples}) and a
-#'         default system role.
-#'   \item In custom mode (\code{custom = TRUE}), it uses user-supplied prompts (\code{user.prompts}) and a custom
-#'         cleaning function (\code{cleaner_fun}) to parse the language model's output.
+#' This internal function drives the item generation process for the AI-GENIE pipeline and now also supports
+#' performance-based assessments (via the performance flag). It interacts with a language model API (e.g., OpenAI GPT or Groq-based models)
+#' to generate candidate items. The function handles both self-report (regular) items and performance items based on the parameter
+#' \code{performance}.
+#'
+#' In self-report mode (\code{performance = FALSE}), the function uses \code{item.attributes} (a named list of item attributes)
+#' to build prompts (via \code{create.prompts}) and expects the response cleaning to yield a data frame with (at least) two columns
+#' (e.g., \code{item} and \code{type}). In performance mode (\code{performance = TRUE}), \code{item.attributes} is assumed to
+#' represent the difficulty information for each item type (and is also used as the validated difficulty list), and prompts are built
+#' via \code{create.prompts} (with \code{performance = TRUE} and additional parameters such as \code{audience}). In this case, the
+#' expected response format is different, and the cleaning step uses \code{clean_performance_items} (or a custom cleaning function that returns
+#' a data frame with the columns \code{statement}, \code{answer}, \code{difficulty}, and \code{type}).
+#'
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Adjusts the model name for API compatibility.
+#'   \item Generates prompts (using \code{create.prompts} or user-provided prompts in custom mode) based on the item types.
+#'         In performance mode, the prompt instructs the model to generate items in the format:
+#'         \cr \verb|<item statement><<DELIM>> <answer><<DELIM>> <difficulty level>|,
+#'         with each item on a new line and including any item type definition if provided.
+#'   \item Determines the correct API function to call based on the model (e.g., OpenAI GPT or Groq).
+#'   \item Iteratively calls the API (with timeout and error handling) until the target number of unique items is generated for each item type.
+#'   \item Cleans the model output using either the built-in cleaning functions (\code{clean_items} for self-report mode and
+#'         \code{clean_performance_items} for performance mode) or a user-supplied cleaning function (with validation via
+#'         \code{validate_return_object}).
+#'   \item Aggregates the generated items, removes duplicates, and returns a final data frame containing the items.
 #' }
 #'
-#' For each item type, the function repeatedly calls the language model API until a target number of unique items,
-#' as specified by \code{target.N}, is generated or until a threshold of consecutive errors or iterations with no new
-#' items is reached. When \code{adaptive = TRUE}, previously generated items are included in subsequent API calls to
-#' help reduce redundancy. The function also cleans and deduplicates the generated items before returning the final
-#' output.
-#'
-#' @param model A character string specifying the language model to use. Internally, certain model names are mapped
-#'              to API-specific identifiers (e.g., "gpt3.5" becomes "gpt-3.5-turbo").
-#' @param temperature Numeric; controls the randomness of the model's output (range: 0–2).
-#' @param top.p Numeric; sets the top-p sampling parameter (range: 0–1).
-#' @param groq.API A character string containing the Groq API key (used when a non-GPT model is selected).
+#' @param model A character string specifying the language model to use (e.g., "gpt3.5", "gpt4o", "llama3", "gemma2", "mixtral", "deepseek").
+#' @param temperature A numeric value controlling the randomness of the model's output.
+#' @param top.p A numeric value controlling the diversity of the model's output.
+#' @param groq.API A character string containing the Groq API key (used for non-GPT models).
 #' @param openai.API A character string containing the OpenAI API key.
 #' @param target.N An integer or vector of integers specifying the target number of items to generate for each item type.
-#' @param item.attributes A named list where each element is a character vector of attributes for an item type.
-#'                        The names of the list elements serve as the item type labels.
-#' @param scale.title An optional character string specifying the title of the inventory.
-#' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
-#' @param item.examples An optional character vector of example item statements to guide generation.
-#' @param system.role An optional character string describing the role the language model should assume
-#'                    (e.g., "an expert psychometrician and test developer"). If \code{NULL}, a default is generated.
-#' @param user.prompts (Required when \code{custom = TRUE}) A named list of custom prompt strings for each item type.
-#' @param item.type.definitions An optional named list or data frame providing brief definitions (up to 250 characters)
-#'                              for each item type. In default mode, these definitions are prepended to the generated prompts.
-#' @param cleaner_fun (Required when \code{custom = TRUE}) A user-supplied function to clean and parse the language model's output.
-#'                    The function must accept a single parameter (the raw output text) and return a data frame with two columns:
-#'                    \code{item} and \code{attribute}.
-#' @param custom Logical; if \code{TRUE}, user-supplied prompts and cleaning function are used. Defaults to \code{FALSE}.
-#' @param adaptive Logical; if \code{TRUE}, previously generated items are incorporated into subsequent API calls to reduce redundancy.
-#' @param silently Logical; if \code{TRUE}, progress and status messages are suppressed.
-#' @param ... Additional arguments passed to underlying API calls and helper functions.
+#' @param item.attributes A named list of item attributes (for self-report mode) or difficulty levels (for performance mode).
+#'        In performance mode, the structure is identical to that used in self-report mode.
+#' @param scale.title A character string specifying the title of the scale.
+#' @param sub.domain A character string specifying the sub-domain or subject area.
+#' @param item.examples In self-report mode, a character vector of example items; in performance mode, a data frame
+#'        with columns \code{type}, \code{difficulty}, \code{statement}, and \code{answer}.
+#' @param system.role A character string describing the role the language model should assume.
+#' @param user.prompts A named list of custom prompt strings (used if \code{custom = TRUE}).
+#' @param item.type.definitions An optional named list or data frame of definitions for each item type.
+#' @param cleaner_fun A user-supplied cleaning function (required if \code{custom = TRUE}).
+#' @param custom A boolean indicating whether custom prompts and a cleaning function are used.
+#' @param adaptive A boolean indicating whether previously generated items should be included in subsequent API calls.
+#' @param silently A boolean indicating whether console output should be suppressed.
+#' @param performance A boolean indicating whether the function is running in performance mode.
+#' @param audience (Optional) A non-empty string specifying the intended audience for performance-based items.
 #'
-#' @return A data frame of generated items with at least the following columns:
-#' \describe{
-#'   \item{\code{type}}{The label of the item type for each generated item.}
-#'   \item{\code{statement}}{The cleaned and formatted item statement.}
-#' }
-#' Duplicate items are removed prior to returning the final data frame.
+#' @return A data frame of generated items. In self-report mode, the data frame contains at least columns such as
+#'         \code{statement} (and possibly \code{item} and \code{attribute}). In performance mode, the data frame contains
+#'         the columns \code{statement}, \code{answer}, \code{difficulty}, and \code{type}.
 generate.items.internal <- function(model, temperature, top.p, groq.API, openai.API, target.N, item.attributes,
                                     scale.title, sub.domain, item.examples, system.role, user.prompts,
-                                    item.type.definitions, cleaner_fun, custom, adaptive, silently, ...) {
+                                    item.type.definitions, cleaner_fun, custom, adaptive, silently, performance=FALSE, audience=NULL) {
 
   # Switch model name to the correct name in the API
   model <- switch(
@@ -61,21 +67,33 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     "gpt3.5" = "gpt-3.5-turbo",
     "gpt4o" = "gpt-4o",
     "deepseek" = "deepseek-r1-distill-llama-70b",
-    model # Default to the provided model name if not in the list
+    model
   )
 
   # Extract item types and generate prompts
   if (!custom) {
-    item.types <- names(item.attributes)
-
-    # Generate prompts with definitions
-    prompts <- create.prompts(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                              system.role)
-    system.role <- prompts[["system.role"]]
-    user.prompts <- prompts[["user.prompts"]]
+    # In performance mode, we treat item.attributes as difficulty info.
+    if (performance) {
+      item.types <- names(item.attributes)
+      prompts <- create.prompts(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
+                                system.role, performance = TRUE, audience = audience,
+                                validated_difficulty = item.attributes)
+      system.role <- prompts[["system.role"]]
+      user.prompts <- prompts[["user.prompts"]]
+    } else {
+      item.types <- names(item.attributes)
+      prompts <- create.prompts(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
+                                system.role)
+      system.role <- prompts[["system.role"]]
+      user.prompts <- prompts[["user.prompts"]]
+    }
   } else {
     item.types <- names(user.prompts)
-    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples)
+    if (performance) {
+      system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, NULL)
+    } else {
+      system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples)
+    }
   }
 
   # Determine which model to use
@@ -91,7 +109,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     max_tokens_set <- 7000L
   }
 
-  # For o1 and o3 models, use 'max_completion_tokens' and set it to 20000.
+  # For o1 and o3 models, use 'max_completion_tokens'
   if (grepl("o1", model) || grepl("o3", model)) {
     completion_param <- "max_completion_tokens"
     completion_value <- 20000L
@@ -100,7 +118,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     completion_value <- max_tokens_set
   }
 
-  # Helper function to call the API using the correct parameter
   call_generate_FUN <- function(messages_list) {
     call_params <- list(
       model = model,
@@ -112,31 +129,25 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     do.call(generate_FUN, call_params)
   }
 
-  items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
-
-  if (!custom) {
+  if (!custom && !performance) {
     split_content <- tm::stemDocument(unlist(item.attributes))
     split_content <- tolower(gsub("[[:punct:]]", "", split_content))
-    # Duplicate attribute check is already handled in validate_item_attributes
   }
 
-  if (is.null(item.examples)) {
-    examples.incl <- FALSE
-  } else {
-    examples.incl <- TRUE
-  }
+  examples.incl <- !is.null(item.examples)
 
   max_sample_size <- if (examples.incl && grepl("gpt", model)) 50 else if (examples.incl) 150 else if (grepl("gpt", model)) 75 else 200
+
+  items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
 
   for (i in seq_along(item.types)) {
     unique_items <- character()
     items_df_medium <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
     current_label <- item.types[[i]]
 
-    # Print "Generating items for..." message
-    if(!silently){
+    if (!silently) {
       cat(paste("Generating items for", current_label, "...\n"))
-      flush.console()  # Ensure message is printed immediately
+      flush.console()
     }
 
     error_count <- 0
@@ -148,23 +159,18 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
       response <- ""; class(response) <- "try-error"
 
-      # API Call Loop
       while (inherits(response, "try-error")) {
         response <- tryCatch(
           {
-            # Construct the 'content' for the user message
             if (is.null(system.role)) {
               stop("Error: 'system.role' is NULL.")
             }
-
             if (is.null(user.prompts[[i]])) {
               stop(paste0("Error: 'user.prompts[[", i, "]]' is NULL."))
             }
-
             if (adaptive && length(unique_items) > 0) {
               sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
               previous_items_text <- paste0(sampled_items, collapse = "\n")
-
               constructed_content <- paste0(
                 user.prompts[[i]],
                 "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",
@@ -179,17 +185,15 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
               stop("Error: Constructed 'content' for user message is NULL or empty.")
             }
 
-            # Construct messages_list
             messages_list <- list(
               list("role" = "system", "content" = system.role),
               list("role" = "user", "content" = constructed_content)
             )
 
-            if(is.null(response)){
+            if (is.null(response)) {
               stop()
             }
 
-            # API Call with Timeout using the helper function
             R.utils::withTimeout({
               response <- call_generate_FUN(messages_list)
             }, timeout = 20, onTimeout = "error")
@@ -199,37 +203,25 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             max_consecutive_errors <- 10
             error_count <<- error_count + 1
             last_error_message <<- conditionMessage(e)
-
-            # Check if the error has happened consecutively enough times to be considered critical
             if (error_count >= max_consecutive_errors) {
-              # Now print the full error message, since it has become critical
               cat("\n\n Critical API error encountered: ", last_error_message, "\n")
             }
-
-            # Handle error logic if no new items are generated
             continue_process <- handle_error_logic(
               error_count = error_count,
               unique_items_generated = length(unique_items),
-              error_type = "api_error",  # Specify the error type
+              error_type = "api_error",
               current_label = current_label
             )
-
             if (!continue_process) {
-              break  # Exit the loop and proceed to the next item type
+              break
             }
-
-            # Reprint progress line after potential messages
             if (!silently) {
               cat(sprintf("\rItems generated for %s: %d", current_label, length(unique_items)))
               flush.console()
             }
-
-            # Return a 'try-error' class to continue the loop
             structure(list(), class = "try-error")
           }
         )
-
-        # Reset error_count after successful API call
         if (!inherits(response, "try-error")) {
           error_count <- 0
         }
@@ -238,17 +230,24 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
       Sys.sleep(runif(1, min = 1, max = 3))
 
       if (!custom) {
-        # Use the clean_items function to process and clean the AI-generated items
-        current_items_df <- clean_items(response, split_content, data.frame(), current_label)
+        if (performance) {
+          current_items_df <- clean_performance_items(response)
+          current_items_df <- data.frame(
+            type = rep(current_label, length(current_items_df$statement)),
+            statement = current_items_df$statement,
+            answer = current_items_df$answer,
+            difficulty = current_items_df$difficulty,
+            stringsAsFactors = FALSE
+          )
+        } else {
+          current_items_df <- clean_items(response, split_content, data.frame(), current_label)
+        }
       } else {
-        # Custom cleaning branch with retry mechanism
         max_cleaning_attempts <- 5
         cleaning_attempt <- 1
         cleaning_success <- FALSE
 
         while (cleaning_attempt <= max_cleaning_attempts && !cleaning_success) {
-
-          # If this is a retry, re-run the API call for a fresh response
           if (cleaning_attempt > 1) {
             Sys.sleep(runif(1, min = 1, max = 3))
             response <- tryCatch({
@@ -279,7 +278,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
           cleaning_result <- tryCatch({
             output <- cleaner_fun(response$choices[[1]]$message$content)
-            validate_output <- validate_return_object(output, n_empty, item.attributes)
+            validate_output <- validate_return_object(output, n_empty, if (performance) item.attributes else item.attributes, performance = performance)
             list(success = TRUE, validate_output = validate_output)
           }, error = function(e) {
             list(success = FALSE, error = e)
@@ -288,9 +287,15 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
           if (cleaning_result$success) {
             cleaning_success <- TRUE
             validate_output <- cleaning_result$validate_output
-            cleaned_items <- validate_output[["items"]]
-            n_empty <- validate_output[["n_empty"]]
-            cleaned_item_attributes <- validate_output[["item_attributes"]]
+            if (performance) {
+              cleaned_items <- validate_output$statement
+              cleaned_item_answers <- validate_output$answer
+              cleaned_item_difficulties <- validate_output$difficulty
+            } else {
+              cleaned_items <- validate_output[["items"]]
+              n_empty <- validate_output[["n_empty"]]
+              cleaned_item_attributes <- validate_output[["item_attributes"]]
+            }
           } else {
             cleaning_attempt <- cleaning_attempt + 1
             if (cleaning_attempt > max_cleaning_attempts) {
@@ -299,34 +304,39 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
           }
         }
 
-        current_items_df <- data.frame(type = rep(current_label, length(cleaned_items)),
-                                       attribute = cleaned_item_attributes,
-                                       statement = cleaned_items)
+        if (performance) {
+          current_items_df <- data.frame(
+            type = rep(current_label, length(cleaned_items)),
+            statement = cleaned_items,
+            answer = cleaned_item_answers,
+            difficulty = cleaned_item_difficulties,
+            stringsAsFactors = FALSE
+          )
+        } else {
+          current_items_df <- data.frame(type = rep(current_label, length(cleaned_items)),
+                                         attribute = cleaned_item_attributes,
+                                         statement = cleaned_items,
+                                         stringsAsFactors = FALSE)
+        }
       }
 
-      # Ensure all whitespace is trimmed
       current_items_df$statement <- sapply(current_items_df$statement, trimws)
       current_items_df$statement <- unique(current_items_df$statement)
 
-      # Identify new unique items
       new_unique_items <- unique(setdiff(current_items_df$statement, unique_items))
-
-      # Update unique_items and items_df_medium
       unique_items <- c(unique_items, new_unique_items)
-      unique_items <- unique(unique_items)  # Ensure items are unique
+      unique_items <- unique(unique_items)
+
       items_df_medium <- rbind(items_df_medium,
                                current_items_df[current_items_df$statement %in% new_unique_items, ])
+      items_df_medium <- items_df_medium[!duplicated(items_df_medium$statement), ]
 
-      items_df_medium <- items_df_medium[!duplicated(items_df_medium$statement),]
-
-      # Update consecutive_no_new_items
       if (length(new_unique_items) == 0) {
         consecutive_no_new_items <- consecutive_no_new_items + 1
       } else {
-        consecutive_no_new_items <- 0 # Reset if new items were added
+        consecutive_no_new_items <- 0
       }
 
-      # Handle error logic if no new items are generated
       continue_process <- handle_error_logic(
         error_count = consecutive_no_new_items,
         unique_items_generated = length(unique_items),
@@ -334,49 +344,45 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
       )
 
       if (!continue_process) {
-        break # Exit the loop and proceed to the next item type
+        break
       }
 
-      # Update progress dynamically
-      if (!silently){
+      if (!silently) {
         cat(sprintf("\rItems generated for %s: %d", current_label, length(unique_items)))
         flush.console()
       }
     }
 
     items_df <- rbind(items_df, items_df_medium)
-    items_df_nd <- items_df[!duplicated(items_df$statement),]
+    items_df_nd <- items_df[!duplicated(items_df$statement), ]
 
-    if (nrow(items_df) != nrow(items_df_nd)){
-      if (!silently){
+    if (nrow(items_df) != nrow(items_df_nd)) {
+      if (!silently) {
         cat("\n")
         cat(paste(nrow(items_df) - nrow(items_df_nd), "duplicate items detected and removed."))
         cat("\n")
       }
     }
 
-    if(!silently){
-      # Move to the next line after finishing with the current label
-      cat("\n")
-      cat("\n")
+    if (!silently) {
+      cat("\n\n")
       flush.console()
     }
   }
 
   items_df$statement <- trimws(gsub('[\"\\\']', "", items_df$statement))
   rownames(items_df) <- NULL
+  items_df_nd <- items_df[!duplicated(items_df$statement), ]
 
-  items_df_nd <- items_df[!duplicated(items_df$statement),]
-
-  if (nrow(items_df) != nrow(items_df_nd)){
-    if (!silently){
+  if (nrow(items_df) != nrow(items_df_nd)) {
+    if (!silently) {
       cat("\n")
       cat(paste(nrow(items_df) - nrow(items_df_nd), "duplicate item(s) detected and removed."))
       cat("\n")
     }
   }
 
-  if(!silently){
+  if (!silently) {
     cat(paste0("All items generated. Final sample size: ", nrow(items_df_nd)))
   }
   return(items_df_nd)

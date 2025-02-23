@@ -706,6 +706,59 @@ validate_prompt <- function(openai.API=NULL, groq.API = NULL,
 }
 
 
+#' @export
+p_AIGENIE <- function(item.difficulty, openai.API, groq.API = NULL, custom = FALSE,
+                      user.prompts = NULL, item.type.definitions = NULL, cleaning.fun = NULL,
+                      system.role = NULL, scale.title = NULL, audience = NULL, sub.domain = NULL,
+                      model = "gpt3.5", item.examples = NULL, target.N = 100, temperature = 1,
+                      top.p = 1, items.only = FALSE, adaptive = TRUE, EGA.model = NULL,
+                      EGA.algorithm = "walktrap", embedding.model = "text-embedding-3-small",
+                      keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
+                      calc.final.stability = FALSE, silently = FALSE) {
 
+  # Validate and update parameters using p_AIGENIE_checks
+  validated <- p_AIGENIE_checks(item.difficulty, openai.API, groq.API, custom, user.prompts,
+                                item.type.definitions, cleaning.fun, system.role, scale.title, audience,
+                                sub.domain, model, item.examples, target.N, temperature, top.p,
+                                items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
+                                keep.org, plot, plot.stability, calc.final.stability, silently)
+
+  # Reassign validated parameters to local variables
+  item.difficulty     <- validated$item.difficulty
+  openai.API          <- validated$openai.API
+  groq.API            <- validated$groq.API
+  custom              <- validated$custom
+  user.prompts        <- validated$user.prompts
+  item.type.definitions <- validated$item.type.definitions
+  cleaning.fun        <- validated$cleaning.fun
+  system.role         <- validated$system.role
+  scale.title         <- validated$scale.title
+  audience            <- validated$audience
+  sub.domain          <- validated$sub.domain
+  model               <- validated$model
+  item.examples       <- validated$item.examples
+  target.N            <- validated$target.N
+  temperature         <- validated$temperature
+  top.p               <- validated$top.p
+  items.only          <- validated$items.only
+  adaptive            <- validated$adaptive
+  EGA.model           <- validated$EGA.model
+  EGA.algorithm       <- validated$EGA.algorithm
+  embedding.model     <- validated$embedding.model
+  keep.org            <- validated$keep.org
+  plot                <- validated$plot
+  plot.stability      <- validated$plot.stability
+  calc.final.stability <- validated$calc.final.stability
+  silently            <- validated$silently
+
+  # For performance items, we treat item.difficulty as the validated difficulty info,
+  # and pass it as the item.attributes parameter to generate.items.internal.
+  generated_df <- generate.items.internal(model, temperature, top.p, groq.API, openai.API, target.N,
+                                          item.difficulty, scale.title, sub.domain, item.examples,
+                                          system.role, user.prompts, item.type.definitions, cleaning.fun,
+                                          custom, adaptive, silently, performance=TRUE, audience)
+
+  return(generated_df)
+}
 
 
