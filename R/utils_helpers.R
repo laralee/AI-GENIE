@@ -55,7 +55,40 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
       "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
     )} else {
-      user.prompts[[current_type]] <- NULL
+
+      examples_str <- ""
+
+      if(!is.null(item.examples)){
+      if(any(item.examples$type==current_type)){
+        subset_df <- item.examples[item.examples$type==current_type,]
+        examples_str <- paste0(subset_df$statement, "<<DELIM>> ", subset_df$answer, "<<DELIM>> ", subset_df$difficulty, sep = " ")
+        examples_str <- paste0(examples_str, collapse = "\n")
+      }}
+
+      user.prompts[[current_type]] <- paste0(
+        definition,
+        "You are creating items for a performance-based scale",
+        ifelse(is.null(scale.title), ".", paste0(" called '", scale.title, "'.")),
+        " As such, these items should assess one’s ability level",
+        ifelse(is.null(sub.domain), ".", paste0(" in the subject of ", sub.domain, ".")),
+        ifelse(is.null(audience), "", paste0(" Design these items for ", audience, ".")),
+        " For now, you will focus on generating items meant to distinguish between ",
+        ifelse(is.null(audience), "users", audience),
+        " who have a ",
+        paste0(attributes[-length(attributes)], collapse = " ability level, "),
+        " ability level, and ", attributes[length(attributes)], " ability level.",
+        " For now, ONLY generate items pertaining to ", current_type, ".",
+        " Do NOT create any other item type. Generate EXACTLY three items for EACH ability level.",
+        " Ensure you include the answer to the item as well.",
+        " Each item MUST be separated by a newline (\\n).",
+        " Place EACH item on its own line, and format each item EXACTLY as follows:",
+        " \n<item statement><<DELIM>> <answer><<DELIM>> <difficulty level>\n",
+        " That is, format the item by including the item statement, followed by '<<DELIM>> ',",
+        " followed by the correct answer, followed by '<<DELIM>> ', followed by the difficulty level.",
+        " Do NOT include any additional text or formatting. Do NOT number the output. Do NOT label the items.",
+        " You should ONLY include the properly formatted items.",
+        ifelse(examples_str=="", "", paste0(" Here are some examples of well-written items:\n", examples_str))
+      )
     }
   }
 

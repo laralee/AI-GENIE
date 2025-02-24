@@ -752,7 +752,29 @@ p_AIGENIE <- function(item.difficulty, openai.API, groq.API = NULL, custom = FAL
   silently            <- validated$silently
 
 
-  return(validated)
+  generated_items <- generate.items.internal(
+    model = model,
+    temperature = temperature,
+    top.p = top.p,
+    groq.API = groq.API,
+    openai.API = openai.API,
+    target.N = target.N,
+    item.attributes = item.difficulty,
+    scale.title = scale.title,
+    sub.domain = sub.domain,
+    item.examples = item.examples,
+    system.role = system.role,
+    user.prompts = user.prompts,
+    item.type.definitions = item.type.definitions,
+    cleaner_fun = cleaning.fun,
+    custom = custom,
+    adaptive = adaptive,
+    silently = silently,
+    performance = TRUE,
+    audience = audience
+  )
+
+  return(generated_items)
 }
 
 
