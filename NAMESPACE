@@ -2,4 +2,5 @@
 
 export(AIGENIE)
 export(GENIE)
+export(p_AIGENIE)
 export(validate_prompt)

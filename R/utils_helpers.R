@@ -10,17 +10,18 @@
 #' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
 #' @param item.examples An optional character vector of example item strings.
 #' @param system.role An optional character string describing the language model's role.
+#' @param performance a logical flag that indicates whether we are in performance mode
 #' @return A list containing:
 #' \describe{
 #'   \item{\code{user.prompts}}{A list of user prompts for each item type to instruct the language model.}
 #'   \item{\code{system.role}}{A character string for the system role prompt.}
 #' }
 create.prompts <- function(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                           system.role) {
+                           system.role, performance) {
   item.types <- names(item.attributes)
 
   system.role <- create.system.role.prompt(system.role, item.types, scale.title,
-                                           sub.domain, item.examples)
+                                           sub.domain, item.examples, performance)
 
   user.prompts <- list()
 
@@ -113,8 +114,12 @@ clean_items <- function(response, split_content,
 #' @param scale.title An optional character string specifying the name of your inventory.
 #' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
 #' @param item.examples An optional character vector of example item strings.
+#' @param performance A boolean indicating whether we are in performance mode or not
 #' @return A character string containing the system role prompt for the language model.
-create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples) {
+create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples,
+                                      performance) {
+
+  if(!performance){
   # add default system role if none was provided
   if(is.null(system.role)){
 
@@ -132,7 +137,9 @@ create.system.role.prompt <- function(system.role, item.types, scale.title, sub.
     system.role <- paste0(system.role, "\n\n Here are some examples of high-quality items that may be found on such a scale."
                           ,"Emulate these items in terms of QUALITY ONLY-- NOT content:\n", item.examples)
   }
+  } else{
 
+  }
   return(system.role)
 }
 
