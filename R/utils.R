@@ -73,7 +73,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
     # Generate prompts with definitions
     prompts <- create.prompts(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                              system.role, performance)
+                              system.role, performance, audience)
     system.role <- prompts[["system.role"]]
     user.prompts <- prompts[["user.prompts"]]
   } else {

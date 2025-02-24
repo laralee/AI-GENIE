@@ -11,17 +11,18 @@
 #' @param item.examples An optional character vector of example item strings.
 #' @param system.role An optional character string describing the language model's role.
 #' @param performance a logical flag that indicates whether we are in performance mode
+#' @param audience a string representing the intended audience when using performance mode
 #' @return A list containing:
 #' \describe{
 #'   \item{\code{user.prompts}}{A list of user prompts for each item type to instruct the language model.}
 #'   \item{\code{system.role}}{A character string for the system role prompt.}
 #' }
 create.prompts <- function(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                           system.role, performance) {
+                           system.role, performance, audience) {
   item.types <- names(item.attributes)
 
   system.role <- create.system.role.prompt(system.role, item.types, scale.title,
-                                           sub.domain, item.examples, performance)
+                                           sub.domain, item.examples, performance, audience)
 
   user.prompts <- list()
 
@@ -42,6 +43,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
     }
 
     # Construct the prompt for all prompts
+    if(!performance){
     user.prompts[[current_type]] <- paste0(
       definition,
       "Generate a total of ", length(attributes) * 2, " UNIQUE, psychometrically reliable and valid ",
@@ -52,7 +54,9 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>> <item content>",
       "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
       "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
-    )
+    )} else {
+      user.prompts[[current_type]] <- NULL
+    }
   }
 
   return(list(user.prompts = user.prompts, system.role = system.role))
@@ -115,9 +119,10 @@ clean_items <- function(response, split_content,
 #' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
 #' @param item.examples An optional character vector of example item strings.
 #' @param performance A boolean indicating whether we are in performance mode or not
+#' @param audience A string indicating the specified target audience for performance mode
 #' @return A character string containing the system role prompt for the language model.
 create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples,
-                                      performance) {
+                                      performance, audience) {
 
   if(!performance){
   # add default system role if none was provided
@@ -138,6 +143,11 @@ create.system.role.prompt <- function(system.role, item.types, scale.title, sub.
                           ,"Emulate these items in terms of QUALITY ONLY-- NOT content:\n", item.examples)
   }
   } else{
+
+    system.role <- paste0("You are an expert scale developer who specalizes in generating items for inventories that assess ability level",
+                          ifelse(is.null(sub.domain), ".", paste0(" in ", sub.domain, ".")), " You are able to draft high-quality, robust items",
+                          ifelse(is.null(audience), ".", paste0(" especially designed for ", audience, "."))
+                        )
 
   }
   return(system.role)
