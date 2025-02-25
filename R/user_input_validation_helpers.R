@@ -1066,20 +1066,18 @@ validate_item_difficulty <- function(item.difficulty) {
 
   # Define the mapping dictionary (keys in lower case)
   mapping <- c(
-    "very easy" = "VERY LOW",
-    "very simple" = "VERY LOW",
-    "very basic" = "VERY LOW",
     "easy" = "LOW",
     "simple" = "LOW",
     "basic" = "LOW",
+    "low" = "LOW",
     "average" = "MEDIUM",
+    "medium" = "MEDIUM",
+    "moderate" = "MEDIUM",
     "standard" = "MEDIUM",
     "hard" = "HIGH",
     "difficult" = "HIGH",
     "challenging" = "HIGH",
-    "very hard" = "VERY HIGH",
-    "very difficult" = "VERY HIGH",
-    "very challenging" = "VERY HIGH"
+    "high" = "HIGH"
   )
 
   # Process each sublist in item.difficulty
@@ -1139,7 +1137,7 @@ validate_item_difficulty <- function(item.difficulty) {
 #' @param valid.types A character vector of valid item types (e.g., the names from the validated `item.difficulty` list).
 #'
 #' @return A standardized data frame where the `difficulty` column has been validated and converted to its canonical form.
-validate_item_examples <- function(item.examples, valid.types) {
+validate_item_examples_p <- function(item.examples, valid.types) {
   # Check that item.examples is a data frame
   if (!is.data.frame(item.examples)) {
     stop("item.examples must be a data frame.")
@@ -1153,20 +1151,18 @@ validate_item_examples <- function(item.examples, valid.types) {
 
   # Define the mapping dictionary (keys in lower case)
   mapping <- c(
-    "very easy" = "VERY LOW",
-    "very simple" = "VERY LOW",
-    "very basic" = "VERY LOW",
     "easy" = "LOW",
     "simple" = "LOW",
     "basic" = "LOW",
+    "low" = "LOW",
     "average" = "MEDIUM",
+    "medium" = "MEDIUM",
+    "moderate" = "MEDIUM",
     "standard" = "MEDIUM",
     "hard" = "HIGH",
     "difficult" = "HIGH",
     "challenging" = "HIGH",
-    "very hard" = "VERY HIGH",
-    "very difficult" = "VERY HIGH",
-    "very challenging" = "VERY HIGH"
+    "high" = "HIGH"
   )
 
   # Process each row
@@ -1188,7 +1184,7 @@ validate_item_examples <- function(item.examples, valid.types) {
     diff_val <- tolower(trimws(as.character(row[["difficulty"]])))
     if (!diff_val %in% names(mapping)) {
       stop(paste("Row", i, "has an unrecognized difficulty value:", row[["difficulty"]],
-                 ". Acceptable synonyms include 'very easy', 'average', 'hard', etc."))
+                 ". Acceptable synonyms include 'easy', 'average', 'hard', etc."))
     }
     # Map the difficulty value to its canonical form
     canonical_diff <- mapping[[diff_val]]

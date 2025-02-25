@@ -4,16 +4,19 @@
 \alias{try_formats}
 \title{Cleaning Function that Cleans the Outputs using All Cleaning Formats}
 \usage{
-try_formats(response, split_content)
+try_formats(response, split_content, performance)
 }
 \arguments{
-\item{response}{A string that contains the output of the LLM model}
+\item{response}{A string that contains the output of the LLM model.}
 
-\item{split_content}{A vector of the item attributes stemmed}
+\item{split_content}{A vector of the item attributes stemmed.}
+
+\item{performance}{A logical flag indicating whether performance mode is active.}
 }
 \value{
-A list of the characteristics and items extracted from the model output if the formatting is successful. Otherwise, an empty list is returned.
+A list of the characteristics and items extracted from the model output if the formatting is successful.
+Otherwise, an empty list is returned.
 }
 \description{
-Cleans the output text based on all of the various formats (Gemma 2, DeepSeek, Mixtral, and Llama)
+Cleans the output text based on all of the various formats (Gemma 2, DeepSeek, Mixtral, and Llama).
 }

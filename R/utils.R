@@ -55,7 +55,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
                                     item.type.definitions, cleaner_fun, custom, adaptive, silently,
                                     performance = FALSE, audience = NULL, ...) {
 
-  # Switch model name to the correct name in the API
+  # Map model name to API-specific identifier
   model <- switch(
     model,
     "llama3" = "llama3-8b-8192",
@@ -64,28 +64,26 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     "gpt3.5" = "gpt-3.5-turbo",
     "gpt4o" = "gpt-4o",
     "deepseek" = "deepseek-r1-distill-llama-70b",
-    model # Default to the provided model name if not in the list
+    model
   )
 
-  # Extract item types and generate prompts
+  # Generate prompts based on mode (custom or not)
   if (!custom) {
     item.types <- names(item.attributes)
-
-    # Generate prompts with definitions
     prompts <- create.prompts(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                              system.role, performance, audience)
-    if(performance){
-      return(prompts)
-    }
-
+                              system.role, audience, performance)
     system.role <- prompts[["system.role"]]
     user.prompts <- prompts[["user.prompts"]]
+
   } else {
     item.types <- names(user.prompts)
-    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples)
+    if (is.null(system.role)) {
+      system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples,
+                                               audience, performance)
+    }
   }
 
-  # Determine which model to use
+  # Determine which API to use
   if (grepl("gpt", model) || grepl("o1", model) || grepl("o3", model)) {
     openai <- reticulate::import("openai")
     openai$api_key <- openai.API
@@ -98,7 +96,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     max_tokens_set <- 7000L
   }
 
-  # For o1 and o3 models, use 'max_completion_tokens' and set it to 20000.
   if (grepl("o1", model) || grepl("o3", model)) {
     completion_param <- "max_completion_tokens"
     completion_value <- 20000L
@@ -107,7 +104,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     completion_value <- max_tokens_set
   }
 
-  # Helper function to call the API using the correct parameter
+  # Helper function to call the API
   call_generate_FUN <- function(messages_list) {
     call_params <- list(
       model = model,
@@ -119,31 +116,37 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     do.call(generate_FUN, call_params)
   }
 
-  items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+  # Initialize the overall data frame.
+  # In performance mode, include an extra column "answer".
+  if (performance) {
+    items_df <- data.frame("type" = character(), "statement" = character(), "answer" = character(), stringsAsFactors = FALSE)
+  } else {
+    items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+  }
 
   if (!custom) {
     split_content <- tm::stemDocument(unlist(item.attributes))
     split_content <- tolower(gsub("[[:punct:]]", "", split_content))
-    # Duplicate attribute check is already handled in validate_item_attributes
   }
 
-  if (is.null(item.examples)) {
-    examples.incl <- FALSE
-  } else {
-    examples.incl <- TRUE
-  }
+  examples.incl <- !is.null(item.examples)
 
   max_sample_size <- if (examples.incl && grepl("gpt", model)) 50 else if (examples.incl) 150 else if (grepl("gpt", model)) 75 else 200
 
+  # Loop over each item type
   for (i in seq_along(item.types)) {
     unique_items <- character()
-    items_df_medium <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+    if (performance) {
+      items_df_medium <- data.frame("type" = character(), "statement" = character(), "answer" = character(), stringsAsFactors = FALSE)
+    } else {
+      items_df_medium <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+    }
+
     current_label <- item.types[[i]]
 
-    # Print "Generating items for..." message
-    if(!silently){
+    if (!silently) {
       cat(paste("Generating items for", current_label, "...\n"))
-      flush.console()  # Ensure message is printed immediately
+      flush.console()
     }
 
     error_count <- 0
@@ -151,92 +154,73 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     n_empty <- 0
     last_error_message <- NULL
 
+    # Generate items until target number is reached
     while (length(unique_items) < target.N[[i]]) {
-
       response <- ""; class(response) <- "try-error"
 
-      # API Call Loop
+      # API call loop with error handling
       while (inherits(response, "try-error")) {
-        response <- tryCatch(
-          {
-            # Construct the 'content' for the user message
-            if (is.null(system.role)) {
-              stop("Error: 'system.role' is NULL.")
-            }
-
-            if (is.null(user.prompts[[i]])) {
-              stop(paste0("Error: 'user.prompts[[", i, "]]' is NULL."))
-            }
-
-            if (adaptive && length(unique_items) > 0) {
-              sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
-              previous_items_text <- paste0(sampled_items, collapse = "\n")
-
-              constructed_content <- paste0(
-                user.prompts[[i]],
-                "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",
-                previous_items_text,
-                "\n"
-              )
-            } else {
-              constructed_content <- user.prompts[[i]]
-            }
-
-            if (is.null(constructed_content) || constructed_content == "") {
-              stop("Error: Constructed 'content' for user message is NULL or empty.")
-            }
-
-            # Construct messages_list
-            messages_list <- list(
-              list("role" = "system", "content" = system.role),
-              list("role" = "user", "content" = constructed_content)
-            )
-
-            if(is.null(response)){
-              stop()
-            }
-
-            # API Call with Timeout using the helper function
-            R.utils::withTimeout({
-              response <- call_generate_FUN(messages_list)
-            }, timeout = 20, onTimeout = "error")
-            response
-          },
-          error = function(e) {
-            max_consecutive_errors <- 10
-            error_count <<- error_count + 1
-            last_error_message <<- conditionMessage(e)
-
-            # Check if the error has happened consecutively enough times to be considered critical
-            if (error_count >= max_consecutive_errors) {
-              # Now print the full error message, since it has become critical
-              cat("\n\n Critical API error encountered: ", last_error_message, "\n")
-            }
-
-            # Handle error logic if no new items are generated
-            continue_process <- handle_error_logic(
-              error_count = error_count,
-              unique_items_generated = length(unique_items),
-              error_type = "api_error",  # Specify the error type
-              current_label = current_label
-            )
-
-            if (!continue_process) {
-              break  # Exit the loop and proceed to the next item type
-            }
-
-            # Reprint progress line after potential messages
-            if (!silently) {
-              cat(sprintf("\rItems generated for %s: %d", current_label, length(unique_items)))
-              flush.console()
-            }
-
-            # Return a 'try-error' class to continue the loop
-            structure(list(), class = "try-error")
+        response <- tryCatch({
+          if (is.null(system.role)) {
+            stop("Error: 'system.role' is NULL.")
           }
-        )
+          if (is.null(user.prompts[[i]])) {
+            stop(paste0("Error: 'user.prompts[[", i, "]]' is NULL."))
+          }
 
-        # Reset error_count after successful API call
+          if (adaptive && length(unique_items) > 0) {
+            sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
+            previous_items_text <- paste0(sampled_items, collapse = "\n")
+            constructed_content <- paste0(user.prompts[[i]],
+                                          "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",
+                                          previous_items_text, "\n")
+          } else {
+            constructed_content <- user.prompts[[i]]
+          }
+
+          if (is.null(constructed_content) || constructed_content == "") {
+            stop("Error: Constructed 'content' for user message is NULL or empty.")
+          }
+
+          messages_list <- list(
+            list("role" = "system", "content" = system.role),
+            list("role" = "user", "content" = constructed_content)
+          )
+
+          if (is.null(response)) {
+            stop()
+          }
+
+          R.utils::withTimeout({
+            response <- call_generate_FUN(messages_list)
+          }, timeout = 20, onTimeout = "error")
+
+          response
+        }, error = function(e) {
+          max_consecutive_errors <- 10
+          error_count <<- error_count + 1
+          last_error_message <<- conditionMessage(e)
+
+          if (error_count >= max_consecutive_errors) {
+            cat("\n\n Critical API error encountered: ", last_error_message, "\n")
+          }
+
+          continue_process <- handle_error_logic(error_count = error_count,
+                                                 unique_items_generated = length(unique_items),
+                                                 error_type = "api_error",
+                                                 current_label = current_label)
+          if (!continue_process) {
+            break
+          }
+
+          if (!silently) {
+            cat(sprintf("\rItems generated for %s: %d", current_label, length(unique_items)))
+            flush.console()
+          }
+
+          structure(list(), class = "try-error")
+        })
+
         if (!inherits(response, "try-error")) {
           error_count <- 0
         }
@@ -244,30 +228,25 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
       Sys.sleep(runif(1, min = 1, max = 3))
 
+      # Non-custom mode: use built-in cleaning function with performance flag.
       if (!custom) {
-        # Use the clean_items function to process and clean the AI-generated items
-        current_items_df <- clean_items(response, split_content, data.frame(), current_label)
+        current_items_df <- clean_items(response, split_content, data.frame(), current_label, performance)
       } else {
-        # Custom cleaning branch with retry mechanism
+        # Custom mode: use user-supplied cleaning function (cleaner_fun) with retry mechanism.
         max_cleaning_attempts <- 5
         cleaning_attempt <- 1
         cleaning_success <- FALSE
 
         while (cleaning_attempt <= max_cleaning_attempts && !cleaning_success) {
-
-          # If this is a retry, re-run the API call for a fresh response
           if (cleaning_attempt > 1) {
             Sys.sleep(runif(1, min = 1, max = 3))
             response <- tryCatch({
               if (adaptive && length(unique_items) > 0) {
                 sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
                 previous_items_text <- paste0(sampled_items, collapse = "\n")
-                constructed_content <- paste0(
-                  user.prompts[[i]],
-                  "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",
-                  previous_items_text,
-                  "\n"
-                )
+                constructed_content <- paste0(user.prompts[[i]],
+                                              "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",
+                                              previous_items_text, "\n")
               } else {
                 constructed_content <- user.prompts[[i]]
               }
@@ -286,8 +265,9 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
           cleaning_result <- tryCatch({
             output <- cleaner_fun(response$choices[[1]]$message$content)
-            validate_output <- validate_return_object(output, n_empty, item.attributes)
-            list(success = TRUE, validate_output = validate_output)
+            # Validate output with performance flag passed along.
+            validate_output <- validate_return_object(output, n_empty, item.attributes, performance = performance)
+            list(success = TRUE, validate_output = validate_output, output = output)
           }, error = function(e) {
             list(success = FALSE, error = e)
           })
@@ -298,6 +278,12 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             cleaned_items <- validate_output[["items"]]
             n_empty <- validate_output[["n_empty"]]
             cleaned_item_attributes <- validate_output[["item_attributes"]]
+
+            if (performance) {
+              # In performance mode, extract the answers from the output.
+              # Assumes the user-supplied cleaning function returns a data frame with an "answer" column.
+              cleaned_answers <- cleaning_result$output$answer
+            }
           } else {
             cleaning_attempt <- cleaning_attempt + 1
             if (cleaning_attempt > max_cleaning_attempts) {
@@ -306,89 +292,90 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
           }
         }
 
-        current_items_df <- data.frame(type = rep(current_label, length(cleaned_items)),
-                                       attribute = cleaned_item_attributes,
-                                       statement = cleaned_items)
+        if (performance) {
+          current_items_df <- data.frame(
+            type = rep(current_label, length(cleaned_items)),
+            attribute = cleaned_item_attributes,
+            statement = cleaned_items,
+            answer = cleaned_answers,
+            stringsAsFactors = FALSE
+          )
+        } else {
+          current_items_df <- data.frame(
+            type = rep(current_label, length(cleaned_items)),
+            attribute = cleaned_item_attributes,
+            statement = cleaned_items,
+            stringsAsFactors = FALSE
+          )
+        }
       }
 
-      # Ensure all whitespace is trimmed
+      # Trim whitespace and deduplicate statements
       current_items_df$statement <- sapply(current_items_df$statement, trimws)
       current_items_df$statement <- unique(current_items_df$statement)
-
-      # Identify new unique items
       new_unique_items <- unique(setdiff(current_items_df$statement, unique_items))
-
-      # Update unique_items and items_df_medium
       unique_items <- c(unique_items, new_unique_items)
-      unique_items <- unique(unique_items)  # Ensure items are unique
+      unique_items <- unique(unique_items)
+
       items_df_medium <- rbind(items_df_medium,
                                current_items_df[current_items_df$statement %in% new_unique_items, ])
+      items_df_medium <- items_df_medium[!duplicated(items_df_medium$statement), ]
 
-      items_df_medium <- items_df_medium[!duplicated(items_df_medium$statement),]
-
-      # Update consecutive_no_new_items
       if (length(new_unique_items) == 0) {
         consecutive_no_new_items <- consecutive_no_new_items + 1
       } else {
-        consecutive_no_new_items <- 0 # Reset if new items were added
+        consecutive_no_new_items <- 0
       }
 
-      # Handle error logic if no new items are generated
-      continue_process <- handle_error_logic(
-        error_count = consecutive_no_new_items,
-        unique_items_generated = length(unique_items),
-        error_type = "no_new_items"
-      )
-
+      continue_process <- handle_error_logic(error_count = consecutive_no_new_items,
+                                             unique_items_generated = length(unique_items),
+                                             error_type = "no_new_items")
       if (!continue_process) {
-        break # Exit the loop and proceed to the next item type
+        break
       }
 
-      # Update progress dynamically
-      if (!silently){
+      if (!silently) {
         cat(sprintf("\rItems generated for %s: %d", current_label, length(unique_items)))
         flush.console()
       }
     }
 
     items_df <- rbind(items_df, items_df_medium)
-    items_df_nd <- items_df[!duplicated(items_df$statement),]
-
-    if (nrow(items_df) != nrow(items_df_nd)){
-      if (!silently){
+    items_df_nd <- items_df[!duplicated(items_df$statement), ]
+    if (nrow(items_df) != nrow(items_df_nd)) {
+      if (!silently) {
         cat("\n")
         cat(paste(nrow(items_df) - nrow(items_df_nd), "duplicate items detected and removed."))
         cat("\n")
       }
     }
-
-    if(!silently){
-      # Move to the next line after finishing with the current label
+    if (!silently) {
       cat("\n")
       cat("\n")
       flush.console()
     }
   }
 
+  # Final cleanup: remove extraneous quotes and trim whitespace.
   items_df$statement <- trimws(gsub('[\"\\\']', "", items_df$statement))
+  if (performance) {
+    items_df$answer <- trimws(gsub('[\"\\\']', "", items_df$answer))
+  }
   rownames(items_df) <- NULL
-
-  items_df_nd <- items_df[!duplicated(items_df$statement),]
-
-  if (nrow(items_df) != nrow(items_df_nd)){
-    if (!silently){
+  items_df_nd <- items_df[!duplicated(items_df$statement), ]
+  if (nrow(items_df) != nrow(items_df_nd)) {
+    if (!silently) {
       cat("\n")
       cat(paste(nrow(items_df) - nrow(items_df_nd), "duplicate item(s) detected and removed."))
       cat("\n")
     }
   }
-
-  if(!silently){
+  if (!silently) {
     cat(paste0("All items generated. Final sample size: ", nrow(items_df_nd)))
   }
+
   return(items_df_nd)
 }
-
 
 
 #' Run the AI-GENIE Reduction and Analysis Pipeline

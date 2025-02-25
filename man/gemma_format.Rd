@@ -4,15 +4,17 @@
 \alias{gemma_format}
 \title{Gemma 2 Output Cleaning}
 \usage{
-gemma_format(response, split_content)
+gemma_format(response, split_content, performance)
 }
 \arguments{
-\item{response}{A string that contains the output of the LLM model}
+\item{response}{A string that contains the output of the LLM model.}
 
-\item{split_content}{A vector of the item attributes stemmed (not currently used)}
+\item{split_content}{A vector of the item attributes stemmed (not currently used).}
+
+\item{performance}{A logical flag indicating whether performance mode is active.}
 }
 \value{
-A list of the characteristics and items extracted from the model output
+A list of the characteristics and items extracted from the model output.
 }
 \description{
 Cleans the output text based on the expected typical output of the Gemma 2 model.

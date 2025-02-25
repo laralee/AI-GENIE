@@ -9,7 +9,9 @@ create.system.role.prompt(
   item.types,
   scale.title,
   sub.domain,
-  item.examples
+  item.examples,
+  audience,
+  performance
 )
 }
 \arguments{
@@ -22,6 +24,10 @@ create.system.role.prompt(
 \item{sub.domain}{An optional character string specifying the inventory's sub-domain or specialty.}
 
 \item{item.examples}{An optional character vector of example item strings.}
+
+\item{audience}{a string that names the audience of the scale (used in performance mode)}
+
+\item{performance}{a logical flag indicating whether to use performance mode}
 }
 \value{
 A character string containing the system role prompt for the language model.

@@ -4,7 +4,7 @@
 \alias{validate_return_object}
 \title{Validate Return Object from Cleaning Function (List Version)}
 \usage{
-validate_return_object(output, n_empty, item_attributes)
+validate_return_object(output, n_empty, item_attributes, performance)
 }
 \arguments{
 \item{output}{The output object returned by the user-provided \code{cleaning.fun} function.}
@@ -12,9 +12,11 @@ validate_return_object(output, n_empty, item_attributes)
 \item{n_empty}{The number of times the cleaning function failed to return any valid items}
 
 \item{item_attributes}{A named list containing item type labels and their corresponding attributes.}
+
+\item{performance}{a logical flag indicating whether we are in performance mode}
 }
 \value{
-A list containing the character vector of cleaned item statements, the character vector containing the cleaned item attributes, and the number of items the cleaning function failed to return viable output consecutively.
+A list containing the character vector of cleaned item statements, the character vector containing the cleaned item attributes (and the item answers in performance mode), and the number of items the cleaning function failed to return viable output consecutively.
 }
 \description{
 Validates the output of the user-provided text cleaning function (\code{cleaning.fun}) to ensure it returns a list of cleaned items. This function checks that the output is a list of character strings, contains no missing or empty values, and correctly formats the item data by associating each item with its corresponding type.

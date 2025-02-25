@@ -22,6 +22,8 @@ generate.items.internal(
   custom,
   adaptive,
   silently,
+  performance = FALSE,
+  audience = NULL,
   ...
 )
 }
@@ -65,6 +67,10 @@ The function must accept a single parameter (the raw output text) and return a d
 \item{adaptive}{Logical; if \code{TRUE}, previously generated items are incorporated into subsequent API calls to reduce redundancy.}
 
 \item{silently}{Logical; if \code{TRUE}, progress and status messages are suppressed.}
+
+\item{performance}{Logical; if \code{TRUE}, the function proceeds in performance mode.}
+
+\item{audience}{String; only used in performance mode}
 
 \item{...}{Additional arguments passed to underlying API calls and helper functions.}
 }

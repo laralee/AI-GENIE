@@ -18,11 +18,11 @@
 #'   \item{\code{system.role}}{A character string for the system role prompt.}
 #' }
 create.prompts <- function(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                           system.role, performance, audience) {
+                           system.role, audience, performance) {
   item.types <- names(item.attributes)
 
   system.role <- create.system.role.prompt(system.role, item.types, scale.title,
-                                           sub.domain, item.examples, performance, audience)
+                                           sub.domain, item.examples, audience, performance)
 
   user.prompts <- list()
 
@@ -51,8 +51,9 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
       current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic." ,
       "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
-      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>> <item content>",
-      "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
+      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<DELIM>>><the item itself>",
+      "\nThat is, the item's characteristic, followed by '<<<DELIM>>>', followed by the item itself. ",
+      "This format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
       "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
     )} else {
 
@@ -61,7 +62,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       if(!is.null(item.examples)){
       if(any(item.examples$type==current_type)){
         subset_df <- item.examples[item.examples$type==current_type,]
-        examples_str <- paste0(subset_df$statement, "<<DELIM>> ", subset_df$answer, "<<DELIM>> ", subset_df$difficulty, sep = " ")
+        examples_str <- paste0(subset_df$statement, "<<<DELIM>>>", subset_df$answer, "<<<DELIM>>>", subset_df$difficulty, sep = " ")
         examples_str <- paste0(examples_str, collapse = "\n")
       }}
 
@@ -82,63 +83,21 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
         " Ensure you include the answer to the item as well.",
         " Each item MUST be separated by a newline (\\n).",
         " Place EACH item on its own line, and format each item EXACTLY as follows:",
-        " \n<item statement><<DELIM>> <answer><<DELIM>> <difficulty level>\n",
-        " That is, format the item by including the item statement, followed by '<<DELIM>> ',",
-        " followed by the correct answer, followed by '<<DELIM>> ', followed by the difficulty level.",
+        " \n<item statement><<<DELIM>>><answer><<<DELIM>>><difficulty level>\n",
+        " That is, format the item by including the item statement, followed by '<<<DELIM>>>',",
+        " followed by the correct answer, followed by '<<<DELIM>>>', followed by the difficulty level.",
         " Do NOT include any additional text or formatting. Do NOT number the output. Do NOT label the items.",
         " You should ONLY include the properly formatted items.",
+        " It is CRITICAL that the items targeting these ", length(attributes), " ability levels are distinct in terms of difficulty.",
+        " Your well-written items should discriminate between ", ifelse(is.null(audience), "users", audience),
+        " who have a ", paste0(attributes[-length(attributes)], collapse = " ability level, "),
+        " ability level, and ", attributes[length(attributes)], " ability level with respect to their understanding of ", current_type, ".",
         ifelse(examples_str=="", "", paste0(" Here are some examples of well-written items:\n", examples_str))
       )
     }
   }
 
   return(list(user.prompts = user.prompts, system.role = system.role))
-}
-
-
-
-
-#' Clean Items
-#'
-#' Cleans and parses the language model's response to extract item statements and their corresponding characteristics. This function ensures the items follow the expected format and removes duplicates.
-#'
-#' @param response The response object from the language model API call.
-#' @param split_content A character vector containing stemmed characteristics to validate against.
-#' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
-#' @param current_label A string of the item type currently being examined
-#' @return A data frame with columns:
-#' \describe{
-#'   \item{\code{type}}{The characteristic or attribute associated with each item.}
-#'   \item{\code{statement}}{The cleaned item statement.}
-#' }
-clean_items <- function(response, split_content,
-                        current_items = data.frame("type" = NULL, "attribute"= NULL, "statement" = NULL),
-                        current_label) {
-
-  # Try different formats on the response
-  formats <- try_formats(response, split_content)
-
-  # Ensure formats are valid and not empty
-  if (all(!is.na(unlist(formats)))) {
-
-    # Create a new data frame with the cleaned items
-    new_items <- data.frame(
-      type = rep(current_label, length(formats$stemmed_characteristics)),
-      attribute = formats$stemmed_characteristics,
-      statement = formats$items
-    )
-
-    # Combine with current items
-    current_items <- rbind.data.frame(current_items, new_items)
-
-    # Remove punctuation and convert to lowercase for uniqueness check
-    statements <- tolower(gsub("[[:punct:]]", "", current_items$statement))
-
-    # Remove duplicates based on cleaned statements
-    current_items <- current_items[!duplicated(statements),]
-  }
-
-  return(current_items)
 }
 
 
@@ -151,13 +110,14 @@ clean_items <- function(response, split_content,
 #' @param scale.title An optional character string specifying the name of your inventory.
 #' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
 #' @param item.examples An optional character vector of example item strings.
-#' @param performance A boolean indicating whether we are in performance mode or not
-#' @param audience A string indicating the specified target audience for performance mode
+#' @param audience a string that names the audience of the scale (used in performance mode)
+#' @param performance a logical flag indicating whether to use performance mode
 #' @return A character string containing the system role prompt for the language model.
 create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples,
-                                      performance, audience) {
+                                      audience, performance) {
 
   if(!performance){
+
   # add default system role if none was provided
   if(is.null(system.role)){
 
@@ -175,17 +135,81 @@ create.system.role.prompt <- function(system.role, item.types, scale.title, sub.
     system.role <- paste0(system.role, "\n\n Here are some examples of high-quality items that may be found on such a scale."
                           ,"Emulate these items in terms of QUALITY ONLY-- NOT content:\n", item.examples)
   }
-  } else{
-
-    system.role <- paste0("You are an expert scale developer who specalizes in generating items for inventories that assess ability level",
-                          ifelse(is.null(sub.domain), ".", paste0(" in ", sub.domain, ".")), " You are able to draft high-quality, robust items",
-                          ifelse(is.null(audience), ".", paste0(" especially designed for ", audience, "."))
-                        )
-
+  } else {
+    # add system role if one was not provided
+    if(is.null(system.role)){
+    system.role <- paste0("You are an expert scale developer who specialized in writing items for ",
+                          "performance-based", ifelse(is.null(sub.domain), "",
+                                                      paste0(" ", sub.domain)), " inventories. ",
+                          "You write robust, high-quality items", ifelse(is.null(audience), ".",
+                                        paste0(" made especially for ", audience, "."))
+                          )
+    }
   }
+
   return(system.role)
 }
 
+#' Clean Items
+#'
+#' Cleans and parses the language model's response to extract item statements and their corresponding characteristics.
+#' This function ensures the items follow the expected format and removes duplicates.
+#'
+#' @param response The response object from the language model API call.
+#' @param split_content A character vector containing stemmed characteristics to validate against.
+#' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
+#' @param current_label A string of the item type currently being examined.
+#' @param performance A logical flag indicating whether we are in performance mode.
+#' @return A data frame with columns:
+#' \describe{
+#'   \item{\code{type}}{The characteristic or attribute associated with each item.}
+#'   \item{\code{statement}}{The cleaned item statement.}
+#'   \item{\code{answer}}{(Performance mode only) The answer associated with the item.}
+#' }
+clean_items <- function(response, split_content,
+                        current_items = data.frame("type" = NULL,
+                                                   "attribute" = NULL,
+                                                   "statement" = NULL,
+                                                   stringsAsFactors = FALSE),
+                        current_label, performance) {
+
+  # Try different formats on the response, passing along the performance flag
+  formats <- try_formats(response, split_content, performance = performance)
+
+  # Ensure formats are valid and not empty
+  if (all(!is.na(unlist(formats)))) {
+
+    if (performance) {
+      # In performance mode, create a data frame with an extra column for answers.
+      new_items <- data.frame(
+        type = rep(current_label, length(formats$characteristics)),
+        attribute = formats$characteristics,  # In performance mode, attribute is the difficulty level
+        statement = formats$items,
+        answer = formats$answers,
+        stringsAsFactors = FALSE
+      )
+    } else {
+      # Regular mode: return only attribute and statement
+      new_items <- data.frame(
+        type = rep(current_label, length(formats$stemmed_characteristics)),
+        attribute = formats$stemmed_characteristics,
+        statement = formats$items,
+        stringsAsFactors = FALSE
+      )
+    }
+
+    # Combine with current items
+    current_items <- rbind.data.frame(current_items, new_items)
+
+    # Remove punctuation and convert to lowercase for uniqueness check
+    statements <- tolower(gsub("[[:punct:]]", "", current_items$statement))
+
+    # Remove duplicates based on cleaned statements
+    current_items <- current_items[!duplicated(statements),]
+  }
+
+  return(current_items)
+}
 
 #' Flatten Text
 #'
@@ -197,15 +221,15 @@ flatten_text <- function(text)
   tolower(gsub("[[:punct:]]", "", text))
 }
 
-
 #' Deep Seek Output Cleaning
 #'
 #' Cleans the output text based on the expected typical output of the DeepSeek model.
 #'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed (not currently used)
-#' @returns A list of the characteristics and items extracted from the model output
-deepseek_format <- function(response, split_content) {
+#' @param response A string that contains the output of the LLM model.
+#' @param split_content A vector of the item attributes stemmed (not currently used).
+#' @param performance A logical flag indicating whether performance mode is active.
+#' @returns A list of the characteristics and items extracted from the model output.
+deepseek_format <- function(response, split_content, performance) {
 
   # Extract the response content
   response_text <- response$choices[[1]]$message$content
@@ -215,200 +239,204 @@ deepseek_format <- function(response, split_content) {
 
   # Split by new lines and trim whitespace
   items <- trimws(strsplit(response_text, "\n")[[1]])
-
-  # Remove empty lines
   items <- items[nzchar(items)]
 
-  # Filter only properly formatted items (e.g., "trait<<<DELIM>>>  statement")
-  items <- items[grepl("^[a-zA-Z]+<<<DELIM>>> ", items)]
-
-  # Separate characteristics and item statements
-  characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
-
-
-  # Return extracted items
-  return(list(characteristics = characteristics, items = items))
+  if (performance) {
+    # In performance mode, each line should be formatted as:
+    # <item statement><<<DELIM>>><answer><<<DELIM>>><difficulty level>
+    split_lines <- strsplit(items, "<<<DELIM>>>")
+    # Keep only lines that split into exactly three parts
+    valid_lines <- Filter(function(x) length(x) == 3, split_lines)
+    if (length(valid_lines) == 0) {
+      return(list(characteristics = NA, items = NA, answers = NA))
+    }
+    # Extract components from each valid line
+    statements <- sapply(valid_lines, function(parts) trimws(parts[1]))
+    answers    <- sapply(valid_lines, function(parts) trimws(parts[2]))
+    difficulties <- sapply(valid_lines, function(parts) trimws(parts[3]))
+    return(list(characteristics = difficulties, items = statements, answers = answers))
+  } else {
+    # Regular mode: Expect two parts only, formatted as "trait<<<DELIM>>>item content"
+    valid_lines <- items[grepl("^[a-zA-Z]+<<<DELIM>>>", items)]
+    characteristics <- trimws(gsub("<<<DELIM>>>.*", "", valid_lines))
+    items <- trimws(gsub(".*<<<DELIM>>>", "", valid_lines))
+    return(list(characteristics = characteristics, items = items))
+  }
 }
-
 
 #' Gemma 2 Output Cleaning
 #'
 #' Cleans the output text based on the expected typical output of the Gemma 2 model.
 #'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed (not currently used)
-#' @returns A list of the characteristics and items extracted from the model output
-gemma_format <- function(response, split_content)
-{
+#' @param response A string that contains the output of the LLM model.
+#' @param split_content A vector of the item attributes stemmed (not currently used).
+#' @param performance A logical flag indicating whether performance mode is active.
+#' @returns A list of the characteristics and items extracted from the model output.
+gemma_format <- function(response, split_content, performance) {
 
-  ## Clean the response so only the items are retained
-  items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-  items <- trimws(items)
-  items <- items[nzchar(items)]
-  items <- gsub("\\*", "", items)
+  content <- response$choices[[1]]$message$content
+  lines <- as.list(strsplit(content, "\n")[[1]])
+  lines <- trimws(unlist(lines))
+  lines <- lines[nzchar(lines)]
+  lines <- gsub("\\*", "", lines)
 
-  # Separate characteristics and items
-  characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
-
-  # Return items and characteristics
-  return(list(characteristics = characteristics, items = items))
-
+  if (performance) {
+    # In performance mode, each line should have three parts:
+    # <item statement><<<DELIM>>><answer><<<DELIM>>><difficulty level>
+    split_lines <- strsplit(lines, "<<<DELIM>>>")
+    valid_lines <- Filter(function(x) length(x) == 3, split_lines)
+    if (length(valid_lines) == 0) {
+      return(list(characteristics = NA, items = NA, answers = NA))
+    }
+    statements   <- sapply(valid_lines, function(parts) trimws(parts[1]))
+    answers      <- sapply(valid_lines, function(parts) trimws(parts[2]))
+    difficulties <- sapply(valid_lines, function(parts) trimws(parts[3]))
+    return(list(characteristics = difficulties, items = statements, answers = answers))
+  } else {
+    characteristics <- trimws(gsub("<<<DELIM>>>.*", "", lines))
+    items <- trimws(gsub(".*<<<DELIM>>>", "", lines))
+    return(list(characteristics = characteristics, items = items))
+  }
 }
 
 #' Mixtral Output Cleaning
 #'
 #' Cleans the output text based on the expected typical output of the Mixtral model.
 #'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed
-#' @returns A list of the characteristics and items extracted from the model output
-mixtral_format <- function(response, split_content)
-{
+#' @param response A string that contains the output of the LLM model.
+#' @param split_content A vector of the item attributes stemmed.
+#' @param performance A logical flag indicating whether performance mode is active.
+#' @returns A list of the characteristics and items extracted from the model output.
+mixtral_format <- function(response, split_content, performance) {
 
-  ## Clean the response so only the items are retained
-  items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-  items <- trimws(items)
-  items <- items[nzchar(items)]
-  items <- gsub("\\*", "", items)
+  lines <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
+  lines <- trimws(unlist(lines))
+  lines <- lines[nzchar(lines)]
+  lines <- gsub("\\*", "", lines)
 
-  ## Characteristics index
-  characteristics_index <- tm::stemDocument(flatten_text(items)) %in% split_content
-
-  ## Get characteristics
-  characteristics <- items[characteristics_index]
-  items <- items[!characteristics_index]
-
-  # Separate characteristics and items
-  characteristics <- rep(trimws(gsub("<<<DELIM>>>.*", "", characteristics)), each = 2)
-  items <- gsub("\\-", "", items)
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
-
-  # Return items and characteristics
-  return(list(characteristics = characteristics, items = items))
-
+  if (performance) {
+    split_lines <- strsplit(lines, "<<<DELIM>>>")
+    valid_lines <- Filter(function(x) length(x) == 3, split_lines)
+    if (length(valid_lines) == 0) {
+      return(list(characteristics = NA, items = NA, answers = NA))
+    }
+    statements   <- sapply(valid_lines, function(parts) trimws(parts[1]))
+    answers      <- sapply(valid_lines, function(parts) trimws(parts[2]))
+    difficulties <- sapply(valid_lines, function(parts) trimws(parts[3]))
+    return(list(characteristics = difficulties, items = statements, answers = answers))
+  } else {
+    characteristics_index <- tm::stemDocument(flatten_text(lines)) %in% split_content
+    characteristics <- lines[characteristics_index]
+    items <- lines[!characteristics_index]
+    characteristics <- rep(trimws(gsub("<<<DELIM>>>.*", "", characteristics)), each = 2)
+    items <- gsub("\\-", "", items)
+    items <- trimws(gsub(".*<<<DELIM>>>", "", items))
+    return(list(characteristics = characteristics, items = items))
+  }
 }
-
 
 #' Llama Output Cleaning
 #'
 #' Cleans the output text based on the expected typical output of the Llama model.
 #'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed
-#' @returns A list of the characteristics and items extracted from the model output
-llama_format <- function(response, split_content)
-{
+#' @param response A string that contains the output of the LLM model.
+#' @param split_content A vector of the item attributes stemmed.
+#' @param performance A logical flag indicating whether performance mode is active.
+#' @returns A list of the characteristics and items extracted from the model output.
+llama_format <- function(response, split_content, performance) {
 
-  ## Clean the response so only the items are retained
-  items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-  items <- trimws(items)
-  items <- items[nzchar(items)]
-  items <- gsub("\\*", "", items)
+  lines <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
+  lines <- trimws(unlist(lines))
+  lines <- lines[nzchar(lines)]
+  lines <- gsub("\\*", "", lines)
 
-  ## Characteristics index
-  characteristics_index <- logical(length(items))
-  for(i in seq_along(split_content)){
-
-    ## Get locations
-    locations <- grepl(split_content[i], tm::stemDocument(flatten_text(items)))
-
-    ## Update index
-    characteristics_index[locations] <- TRUE
-
+  if (performance) {
+    split_lines <- strsplit(lines, "<<<DELIM>>>")
+    valid_lines <- Filter(function(x) length(x) == 3, split_lines)
+    if (length(valid_lines) == 0) {
+      return(list(characteristics = NA, items = NA, answers = NA))
+    }
+    statements   <- sapply(valid_lines, function(parts) trimws(parts[1]))
+    answers      <- sapply(valid_lines, function(parts) trimws(parts[2]))
+    difficulties <- sapply(valid_lines, function(parts) trimws(parts[3]))
+    return(list(characteristics = difficulties, items = statements, answers = answers))
+  } else {
+    characteristics_index <- logical(length(lines))
+    for(i in seq_along(split_content)){
+      locations <- grepl(split_content[i], tm::stemDocument(flatten_text(lines)))
+      characteristics_index <- characteristics_index | locations
+    }
+    characteristics <- rep(trimws(gsub("<<<DELIM>>>.*", "", lines))[characteristics_index], each = 2)
+    items <- trimws(gsub(".*<<<DELIM>>>", "", lines))
+    return(list(characteristics = characteristics, items = items))
   }
-
-  # Separate characteristics and items
-  characteristics <- rep(
-    trimws(gsub("<<<DELIM>>>.*", "", items))[characteristics_index],
-    each = 2
-  )
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
-
-  # Return items and characteristics
-  return(list(characteristics = characteristics, items = items))
-
 }
 
 #' Cleaning Function that Cleans the Outputs using All Cleaning Formats
 #'
-#' Cleans the output text based on all of the various formats (Gemma 2, DeepSeek, Mixtral, and Llama)
+#' Cleans the output text based on all of the various formats (Gemma 2, DeepSeek, Mixtral, and Llama).
 #'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed
-#' @returns A list of the characteristics and items extracted from the model output if the formatting is successful. Otherwise, an empty list is returned.
-try_formats <- function(response, split_content)
-{
+#' @param response A string that contains the output of the LLM model.
+#' @param split_content A vector of the item attributes stemmed.
+#' @param performance A logical flag indicating whether performance mode is active.
+#' @returns A list of the characteristics and items extracted from the model output if the formatting is successful.
+#'          Otherwise, an empty list is returned.
+try_formats <- function(response, split_content, performance) {
   # Try DeepSeek first
-  deepseek <- deepseek_format(response, split_content)
+  deepseek <- deepseek_format(response, split_content, performance = performance)
 
-  ## Set items and characteristics
-  items <- deepseek$items
-  characteristics <- deepseek$characteristics
-
-  ## Update stems
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  # Check for errors in generation
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  # If DeepSeek parsing works, return it
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+  if (performance) {
+    if (!any(is.na(deepseek$items)) && !any(is.na(deepseek$answers)) && !any(is.na(deepseek$characteristics))) {
+      return(list(characteristics = deepseek$characteristics, items = deepseek$items, answers = deepseek$answers))
+    }
+  } else {
+    if (!any(is.na(deepseek$items)) && !any(is.na(deepseek$characteristics))) {
+      return(list(stemmed_characteristics = tm::stemDocument(flatten_text(deepseek$characteristics)), items = deepseek$items))
+    }
   }
 
-  # If DeepSeek fails, fall back to existing formats
-  # Try Gemma:
-  gemma <- gemma_format(response, split_content)
-  items <- gemma$items
-  characteristics <- gemma$characteristics
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+  # Try Gemma
+  gemma <- gemma_format(response, split_content, performance = performance)
+  if (performance) {
+    if (!any(is.na(gemma$items)) && !any(is.na(gemma$answers)) && !any(is.na(gemma$characteristics))) {
+      return(list(characteristics = gemma$characteristics, items = gemma$items, answers = gemma$answers))
+    }
+  } else {
+    if (!any(is.na(gemma$items)) && !any(is.na(gemma$characteristics))) {
+      return(list(stemmed_characteristics = tm::stemDocument(flatten_text(gemma$characteristics)), items = gemma$items))
+    }
   }
 
-  # Try Mixtral:
-  mixtral <- mixtral_format(response, split_content)
-  items <- mixtral$items
-  characteristics <- mixtral$characteristics
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+  # Try Mixtral
+  mixtral <- mixtral_format(response, split_content, performance = performance)
+  if (performance) {
+    if (!any(is.na(mixtral$items)) && !any(is.na(mixtral$answers)) && !any(is.na(mixtral$characteristics))) {
+      return(list(characteristics = mixtral$characteristics, items = mixtral$items, answers = mixtral$answers))
+    }
+  } else {
+    if (!any(is.na(mixtral$items)) && !any(is.na(mixtral$characteristics))) {
+      return(list(stemmed_characteristics = tm::stemDocument(flatten_text(mixtral$characteristics)), items = mixtral$items))
+    }
   }
 
-  # Try LLAMA-3:
-  llama <- llama_format(response, split_content)
-  items <- llama$items
-  characteristics <- llama$characteristics
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
+  # Try LLAMA-3
+  llama <- llama_format(response, split_content, performance = performance)
+  if (performance) {
+    if (!any(is.na(llama$items)) && !any(is.na(llama$answers)) && !any(is.na(llama$characteristics))) {
+      return(list(characteristics = llama$characteristics, items = llama$items, answers = llama$answers))
+    }
+  } else {
+    if (!any(is.na(llama$items)) && !any(is.na(llama$characteristics))) {
+      return(list(stemmed_characteristics = tm::stemDocument(flatten_text(llama$characteristics)), items = llama$items))
+    }
   }
 
   # Return empty list if nothing worked
-  return(list(stemmed_characteristics = NA, items = NA))
+  if (performance) {
+    return(list(characteristics = NA, items = NA, answers = NA))
+  } else {
+    return(list(stemmed_characteristics = NA, items = NA))
+  }
 }
 
 

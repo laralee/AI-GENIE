@@ -7,8 +7,10 @@
 clean_items(
   response,
   split_content,
-  current_items = data.frame(type = NULL, attribute = NULL, statement = NULL),
-  current_label
+  current_items = data.frame(type = NULL, attribute = NULL, statement = NULL,
+    stringsAsFactors = FALSE),
+  current_label,
+  performance
 )
 }
 \arguments{
@@ -18,15 +20,19 @@ clean_items(
 
 \item{current_items}{A data frame of the current items collected so far. Defaults to an empty data frame.}
 
-\item{current_label}{A string of the item type currently being examined}
+\item{current_label}{A string of the item type currently being examined.}
+
+\item{performance}{A logical flag indicating whether we are in performance mode.}
 }
 \value{
 A data frame with columns:
 \describe{
 \item{\code{type}}{The characteristic or attribute associated with each item.}
 \item{\code{statement}}{The cleaned item statement.}
+\item{\code{answer}}{(Performance mode only) The answer associated with the item.}
 }
 }
 \description{
-Cleans and parses the language model's response to extract item statements and their corresponding characteristics. This function ensures the items follow the expected format and removes duplicates.
+Cleans and parses the language model's response to extract item statements and their corresponding characteristics.
+This function ensures the items follow the expected format and removes duplicates.
 }

@@ -4,15 +4,17 @@
 \alias{llama_format}
 \title{Llama Output Cleaning}
 \usage{
-llama_format(response, split_content)
+llama_format(response, split_content, performance)
 }
 \arguments{
-\item{response}{A string that contains the output of the LLM model}
+\item{response}{A string that contains the output of the LLM model.}
 
-\item{split_content}{A vector of the item attributes stemmed}
+\item{split_content}{A vector of the item attributes stemmed.}
+
+\item{performance}{A logical flag indicating whether performance mode is active.}
 }
 \value{
-A list of the characteristics and items extracted from the model output
+A list of the characteristics and items extracted from the model output.
 }
 \description{
 Cleans the output text based on the expected typical output of the Llama model.

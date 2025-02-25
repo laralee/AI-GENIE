@@ -10,7 +10,9 @@ create.prompts(
   scale.title,
   sub.domain,
   item.examples,
-  system.role
+  system.role,
+  audience,
+  performance
 )
 }
 \arguments{
@@ -25,6 +27,10 @@ create.prompts(
 \item{item.examples}{An optional character vector of example item strings.}
 
 \item{system.role}{An optional character string describing the language model's role.}
+
+\item{audience}{a string representing the intended audience when using performance mode}
+
+\item{performance}{a logical flag that indicates whether we are in performance mode}
 }
 \value{
 A list containing:

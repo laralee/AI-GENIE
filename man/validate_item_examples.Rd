@@ -4,41 +4,16 @@
 \alias{validate_item_examples}
 \title{Validate Item Examples}
 \usage{
-validate_item_examples(item.examples, valid.types)
-
-validate_item_examples(item.examples, valid.types)
+validate_item_examples(item.examples, model)
 }
 \arguments{
-\item{item.examples}{A data frame containing columns: \code{type}, \code{difficulty}, \code{statement}, and \code{answer}.}
-
-\item{valid.types}{A character vector of valid item types (e.g., the names from the validated \code{item.difficulty} list).}
+\item{item.examples}{An optional list or vector of well-crafted example item strings.}
 
 \item{model}{A character string specifying the model being used (e.g., "gpt3.5", "gpt4o").}
 }
 \value{
 A single concatenated string of example items separated by newlines, or \code{NULL} if \code{item.examples} is \code{NULL} or empty.
-
-A standardized data frame where the \code{difficulty} column has been validated and converted to its canonical form.
 }
 \description{
 Validates and processes the \code{item.examples} input, ensuring it is a list or vector of strings. Checks for formatting issues, special characters, and character limits based on the specified model. Returns a concatenated string of example items or \code{NULL} if none are provided.
-
-Validates and standardizes the \code{item.examples} data frame for performance-based assessments in the \code{p_AIGENIE} function.
-}
-\details{
-The input must be a data frame with exactly four columns: \code{type}, \code{difficulty}, \code{statement}, and \code{answer}. The function performs the following checks:
-\itemize{
-\item Ensures that the \code{type} column values are present in the valid item types provided (typically the names from \code{item.difficulty}).
-\item Verifies that each entry in the \code{difficulty} column is one of the acceptable values (case-insensitive and whitespace trimmed), and maps them to their canonical forms:
-\itemize{
-\item "very easy", "very simple", "very basic" → "VERY LOW"
-\item "easy", "simple", "basic" → "LOW"
-\item "average", "standard" → "MEDIUM"
-\item "hard", "difficult", "challenging" → "HIGH"
-\item "very hard", "very difficult", "very challenging" → "VERY HIGH"
-}
-\item Checks that the \code{statement} column is not empty or missing.
-\item Checks that the \code{answer} column is provided (it may be numeric or any other type but must not be missing).
-}
-If all checks pass, the function returns a standardized data frame with the \code{difficulty} values converted to their canonical forms (in all caps).
 }
