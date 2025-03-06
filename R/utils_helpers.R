@@ -48,8 +48,9 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
       current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic." ,
       "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
-      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>> <item content>",
-      "\nThis format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
+      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>><item content>",
+      "\nThat is, the item's characteristic, followed by '<<<<DELIM>>>', followed by the item itself. ",
+      "This format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
       "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
     )
   }
@@ -80,14 +81,30 @@ clean_items <- function(response, split_content,
   # Try different formats on the response
   formats <- try_formats(response, split_content)
 
+  # Ensure there are exactly the same number of stemmed_characteristics and items
+  if (length(formats$stemmed_characteristics) != length(formats$items))
+    { return(current_items) }
+
   # Ensure formats are valid and not empty
   if (all(!is.na(unlist(formats)))) {
 
+    # Remove the delimiter if it is still present
+    items <- gsub("<+DELIM>+", "", formats$items)
+    items <- gsub("<+delim>+", "", items)
+    items <- trimws(gsub("^[<>]+|[<>]+$", "", items))
+
+    attribute <- gsub("<+DELIM>+", "", formats$stemmed_characteristics)
+    attribute <- gsub("<+delim>+", "", attribute)
+    attribute <- gsub(">", "", attribute)
+    attribute <- gsub("<", "", attribute)
+    attribute <- trimws(gsub("^[<>]+|[<>]+$", "", attribute))
+
+
     # Create a new data frame with the cleaned items
     new_items <- data.frame(
-      type = rep(current_label, length(formats$stemmed_characteristics)),
-      attribute = formats$stemmed_characteristics,
-      statement = formats$items
+      type = rep(current_label, length(attribute)),
+      attribute = attribute,
+      statement = items
     )
 
     # Combine with current items
@@ -169,12 +186,12 @@ deepseek_format <- function(response, split_content) {
   # Remove empty lines
   items <- items[nzchar(items)]
 
-  # Filter only properly formatted items (e.g., "trait<<<DELIM>>>  statement")
-  items <- items[grepl("^[a-zA-Z]+<<<DELIM>>> ", items)]
+  # Filter only properly formatted items (e.g., "trait<<<DELIM>>>statement")
+  items <- items[grepl("^[a-zA-Z]+\\s*<<<DELIM>>>\\s*", items)]
 
   # Separate characteristics and item statements
   characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
 
 
   # Return extracted items
@@ -200,7 +217,7 @@ gemma_format <- function(response, split_content)
 
   # Separate characteristics and items
   characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -233,7 +250,7 @@ mixtral_format <- function(response, split_content)
   # Separate characteristics and items
   characteristics <- rep(trimws(gsub("<<<DELIM>>>.*", "", characteristics)), each = 2)
   items <- gsub("\\-", "", items)
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
@@ -274,7 +291,7 @@ llama_format <- function(response, split_content)
     trimws(gsub("<<<DELIM>>>.*", "", items))[characteristics_index],
     each = 2
   )
-  items <- trimws(gsub(".*<<<DELIM>>> ", "", items))
+  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
 
   # Return items and characteristics
   return(list(characteristics = characteristics, items = items))
