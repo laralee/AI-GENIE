@@ -12,13 +12,14 @@
 #' @param system.role An optional character string describing the language model's role.
 #' @param performance a logical flag that indicates whether we are in performance mode
 #' @param audience a string representing the intended audience when using performance mode
+#' @param level.description a dataframe representing the description of the items in performace mode
 #' @return A list containing:
 #' \describe{
 #'   \item{\code{user.prompts}}{A list of user prompts for each item type to instruct the language model.}
 #'   \item{\code{system.role}}{A character string for the system role prompt.}
 #' }
 create.prompts <- function(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                           system.role, audience, performance) {
+                           system.role, audience, performance, level.description) {
   item.types <- names(item.attributes)
 
   system.role <- create.system.role.prompt(system.role, item.types, scale.title,
@@ -66,6 +67,58 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
         examples_str <- paste0(examples_str, collapse = "\n")
       }}
 
+      # Determine the audience string to use in definitions.
+      audience_text <- ifelse(is.null(audience) || audience == "", "users", audience)
+
+      # If level.description is provided, extract the definitions for the current item type.
+      if (!is.null(level.description)) {
+        # Assume level.description has been validated and has columns "type", "difficulty", and "description"
+        ld <- level.description[tolower(level.description$type) == tolower(current_type), ]
+        # Drop duplicates and trim whitespace (should already be done by the validator)
+        ld <- ld[!duplicated(ld), ]
+
+        # Build definitions_text from the provided data frame.
+        # We assume that the "difficulty" values are already mapped to one of "LOW", "MEDIUM", or "HIGH".
+        definitions_text <- paste(
+          sapply(unique(ld$difficulty), function(diff) {
+            paste0(diff, " difficulty items: ", ld$description[ld$difficulty == diff])
+          }),
+          collapse = "\n"
+        )
+      } else {
+        # Build dynamic definitions for difficulty levels based on the default approach.
+        difficulty_defs <- c()
+        if ("LOW" %in% attributes) {
+          difficulty_defs <- c(difficulty_defs,
+                               paste0("LOW difficulty items are those that almost all ", audience_text, " can quickly solve. ",
+                                      "That is, even ", audience_text, " who have a low ability will likely solve this item. These items are easy."))
+        }
+        if ("MEDIUM" %in% attributes) {
+          difficulty_defs <- c(difficulty_defs,
+                               paste0("MEDIUM difficulty items are those that about half of ", audience_text,
+                                      " can solve, while about half cannot in a relatively short time frame. ",
+                                      "That is, ", audience_text, " with below average or average ability will struggle with these items. These items are moderately challenging."))
+        }
+        if ("HIGH" %in% attributes) {
+          difficulty_defs <- c(difficulty_defs,
+                               paste0("HIGH difficulty items are those that almost all ", audience_text,
+                                      " cannot solve in a relatively short time frame. ",
+                                      "These items may prove challenging even for ", audience_text, " with extremely high ability. These items are very challenging."))
+        }
+        definitions_text <- paste(difficulty_defs, collapse = "\n")
+      }
+
+      # Build dynamic ordering instructions based on which levels are present.
+      ordering_instructions <- ""
+      if ("LOW" %in% attributes && "MEDIUM" %in% attributes && "HIGH" %in% attributes) {
+        ordering_instructions <- "The LOW difficulty items must be noticeably simpler than the MEDIUM difficulty items, and the MEDIUM items must be noticeably simpler than the HIGH difficulty items."
+      } else if ("LOW" %in% attributes && "MEDIUM" %in% attributes) {
+        ordering_instructions <- "The LOW difficulty items must be noticeably simpler than the MEDIUM difficulty items."
+      } else if ("MEDIUM" %in% attributes && "HIGH" %in% attributes) {
+        ordering_instructions <- "The MEDIUM difficulty items must be noticeably simpler than the HIGH difficulty items."
+      }
+
+      # Build the final prompt dynamically.
       user.prompts[[current_type]] <- paste0(
         definition,
         "You are creating items for a performance-based scale",
@@ -75,25 +128,31 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
         ifelse(is.null(audience), "", paste0(" Design these items for ", audience, ".")),
         " For now, you will focus on generating items meant to distinguish between ",
         ifelse(is.null(audience), "users", audience),
-        " who have a ",
-        paste0(attributes[-length(attributes)], collapse = " ability level, "),
-        " ability level, and ", attributes[length(attributes)], " ability level.",
-        " For now, ONLY generate items pertaining to ", current_type, ".",
-        " Do NOT create any other item type. Generate EXACTLY three items for EACH ability level.",
-        " Ensure you include the answer to the item as well.",
+        " who have distinctly different ability levels.",
+        "\n\n",
+        # Insert difficulty definitions (from level.description if provided; otherwise, dynamic defaults)
+        "Difficulty Definitions:\n", definitions_text, "\n\n",
+        # Insert dynamic ordering instructions if available.
+        if (ordering_instructions != "") paste0(ordering_instructions, "\n\n") else "",
+        "Do NOT create any items that fall between these clearly defined levels.",
+        " Generate EXACTLY FOUR items for EACH difficulty level present.",
+        " Ensure you include the correct answer for each item.",
         " Each item MUST be separated by a newline (\\n).",
         " Place EACH item on its own line, and format each item EXACTLY as follows:",
         " \n<item statement><<<DELIM>>><answer><<<DELIM>>><difficulty level>\n",
-        " That is, format the item by including the item statement, followed by '<<<DELIM>>>',",
-        " followed by the correct answer, followed by '<<<DELIM>>>', followed by the difficulty level.",
-        " Do NOT include any additional text or formatting. Do NOT number the output. Do NOT label the items.",
+        " That is, format the item by including the item statement, followed by '<<<DELIM>>> ',",
+        " followed by the correct answer, followed by '<<<DELIM>>> ', followed by the difficulty level (",
+        paste(attributes, collapse = ", "),
+        ").",
+        " Do NOT include any additional text or formatting. Do NOT number or label the items.",
         " You should ONLY include the properly formatted items.",
-        " It is CRITICAL that the items targeting these ", length(attributes), " ability levels are distinct in terms of difficulty.",
-        " Your well-written items should discriminate between ", ifelse(is.null(audience), "users", audience),
-        " who have a ", paste0(attributes[-length(attributes)], collapse = " ability level, "),
-        " ability level, and ", attributes[length(attributes)], " ability level with respect to their understanding of ", current_type, ".",
-        ifelse(examples_str=="", "", paste0(" Here are some examples of well-written items:\n", examples_str))
+        "\n\nIMPORTANT: ONLY generate items that are related to ", current_type, ".",
+        ifelse(!is.null(examples_str) && examples_str != "",
+               paste0(" Here are some examples of well-written items:\n", examples_str),
+               "")
       )
+
+
     }
   }
 
@@ -1186,4 +1245,74 @@ clean_EGA_output <- function(ega_obj, item_set) {
     item_set <- item_set[, valid_idx, drop = FALSE]
   }
   list(ega_obj = ega_obj, item_set = item_set)
+}
+
+
+#' Clean Generated Data
+#'
+#' Performs post-generation cleaning on the dataset produced by the item generation process.
+#' Specifically, this function:
+#' \itemize{
+#'   \item Removes numbering from the beginning of the `statement` and `attribute` columns.
+#'   \item Strips extraneous characters or symbols from the `attribute` column.
+#'   \item Checks the `type` column for any occurrence of canonical difficulty levels ("LOW", "MEDIUM", "HIGH")
+#'         and replaces them with the proper uppercase value.
+#'   \item Trims leading and trailing whitespace from all columns.
+#'   \item Converts the `attribute` and `type` columns to all uppercase.
+#'   \item Removes rows where the `attribute` value is not one of "LOW", "MEDIUM", or "HIGH".
+#'   \item Removes duplicate rows and rows that contain empty strings or missing values.
+#' }
+#'
+#' @param df A data frame containing at least the columns: `type`, `attribute`, and `statement`.
+#' @return A cleaned data frame with standardized and validated columns.
+clean_generated_data <- function(df) {
+  # Ensure the required columns exist.
+  required_cols <- c("type", "attribute", "statement")
+  if (!all(required_cols %in% names(df))) {
+    stop("The input data frame must contain the columns: type, attribute, and statement.")
+  }
+
+  # 1. Remove numbering from the beginning of the 'statement' and 'attribute' columns.
+  # This will remove patterns like "1. " or "2) " at the beginning.
+  df$statement <- gsub("^\\s*[0-9]+[\\.)]?\\s*", "", df$statement)
+  df$attribute <- gsub("^\\s*[0-9]+[\\.)]?\\s*", "", df$attribute)
+
+  # 2. Remove extra characters/symbols from the 'attribute' and 'statement' columns.
+  # For example, remove non-alphanumeric characters (except whitespace).
+  df$attribute <- gsub("[^A-Za-z0-9\\s]", "", df$attribute)
+  df$statement <- gsub("<item statement>", "", df$statement)
+  df$statement <- gsub("<item>", "", df$statement)
+  df$statement <- gsub("<statement>", "", df$statement)
+
+  # 3. Check the 'type' column for any canonical difficulty levels and replace them.
+  # For example, if "High\n" appears anywhere, replace it with "HIGH".
+  canonical <- c("LOW", "MEDIUM", "HIGH")
+  for (level in canonical) {
+    # Use case-insensitive matching to replace any occurrence with the canonical level.
+    df$type <- gsub(paste0("(?i)", level), level, df$type, perl = TRUE)
+  }
+
+  # 4. Trim leading/trailing whitespace from all columns.
+  df[] <- lapply(df, function(col) {
+    if (is.character(col)) trimws(col) else col
+  })
+
+  # 5. Convert 'attribute' and 'type' columns to all uppercase.
+  df$attribute <- toupper(df$attribute)
+  df$type <- toupper(df$type)
+
+  # 6. Remove rows where the 'attribute' value is not one of "LOW", "MEDIUM", or "HIGH".
+  df <- df[df$attribute %in% canonical, ]
+
+  # 7. Remove duplicate rows and rows with any empty strings or missing values.
+  # First, remove rows with any NA values.
+  df <- df[complete.cases(df), ]
+
+  # Then, remove rows with empty strings in any of the required columns.
+  df <- df[!(df$type == "" | df$attribute == "" | df$statement == ""), ]
+
+  # Finally, drop duplicate rows.
+  df <- df[!duplicated(df), ]
+
+  return(df)
 }

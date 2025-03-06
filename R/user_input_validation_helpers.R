@@ -1212,3 +1212,113 @@ validate_item_examples_p <- function(item.examples, valid.types) {
 
   return(item.examples)
 }
+
+
+
+#' Validate Level Description
+#'
+#' Validates and standardizes the `level.description` data frame for performance-based assessments in the `p_AIGENIE` function.
+#'
+#' The input must be a data frame with at least the following columns (case insensitive): `type`, `difficulty`, and `description`. The function performs the following checks:
+#' \itemize{
+#'   \item If both `level.description` and `item.examples` are NULL, a message is printed (subject to the `silently` flag) warning that results may be poor.
+#'   \item Confirms that the data frame contains at least the required columns: `type`, `difficulty`, and `description`.
+#'   \item Verifies that every value in these columns is a non-empty character string, trimming any leading or trailing whitespace.
+#'   \item Drops duplicate rows.
+#'   \item Ensures that every value in the `type` column appears in the names of `item.difficulties`.
+#'   \item Maps the values in the `difficulty` column using a case-insensitive mapping (e.g., "easy", "simple", "basic", "low" → "LOW"; "average", "medium", "moderate", "standard" → "MEDIUM"; "hard", "difficult", "challenging", "high" → "HIGH") and checks that every mapped value is one of `c("LOW", "MEDIUM", "HIGH")`.
+#' }
+#'
+#' If all checks pass, the function returns a standardized data frame with column names in lowercase and with the `difficulty` values converted to their canonical forms.
+#'
+#' @param level.description An optional data frame containing at least the columns: `type`, `difficulty`, and `description`.
+#' @param item.examples An optional data frame of item examples. If both this and `level.description` are NULL, a warning is printed.
+#' @param item.difficulties A named vector or list representing the valid item types (the names must match the values in the `type` column).
+#' @param silently A logical flag; if TRUE, suppresses warning messages.
+#'
+#' @return A standardized data frame with validated and trimmed `type`, `difficulty`, and `description` columns.
+validate_level_description <- function(level.description, item.examples, item.difficulties, silently) {
+
+  # 1. Warn if both level.description and item.examples are NULL.
+  if (is.null(level.description) && is.null(item.examples)) {
+    if (!silently) message("Warning: Neither 'level.description' nor 'item.examples' was provided. Results may be poor.")
+    # If desired, you might continue (with level.description = NULL) or assign a default.
+  }
+
+  # If level.description is NULL, return NULL.
+  if (is.null(level.description)) {
+    return(NULL)
+  }
+
+  # 2. Validate that level.description is a data frame with required columns.
+  req_cols <- c("type", "difficulty", "description")
+  # Convert column names to lowercase for checking.
+  names(level.description) <- tolower(names(level.description))
+
+  missing_cols <- setdiff(req_cols, names(level.description))
+  if (length(missing_cols) > 0) {
+    stop(paste("level.description is missing required column(s):", paste(missing_cols, collapse = ", ")))
+  }
+
+  # 3. Ensure all required columns are character strings and non-empty; also trim whitespace.
+  for (col in req_cols) {
+    if (!all(sapply(level.description[[col]], is.character))) {
+      stop(paste("All values in column", col, "must be character strings."))
+    }
+    # Trim whitespace from each value
+    level.description[[col]] <- trimws(level.description[[col]])
+    # Check for empty strings
+    if (any(level.description[[col]] == "")) {
+      stop(paste("Column", col, "contains empty strings."))
+    }
+  }
+
+  # 4. Drop duplicate rows (without warning)
+  level.description <- level.description[!duplicated(level.description), ]
+
+  # 5. Every value in the 'type' column must appear in names(item.difficulties).
+  valid_types <- names(item.difficulties)
+  if (!all(level.description$type %in% valid_types)) {
+    invalid <- unique(level.description$type[!(level.description$type %in% valid_types)])
+    stop(paste("The following types in level.description are not in names(item.difficulties):", paste(invalid, collapse = ", ")))
+  }
+
+  # 6. Map the values in the 'difficulty' column.
+  mapping <- c(
+    "easy" = "LOW",
+    "simple" = "LOW",
+    "basic" = "LOW",
+    "low" = "LOW",
+    "average" = "MEDIUM",
+    "medium" = "MEDIUM",
+    "moderate" = "MEDIUM",
+    "standard" = "MEDIUM",
+    "hard" = "HIGH",
+    "difficult" = "HIGH",
+    "challenging" = "HIGH",
+    "high" = "HIGH"
+  )
+
+  # Create a helper function to map a difficulty value (case insensitive).
+  map_difficulty <- function(val) {
+    val_lower <- tolower(val)
+    if (val_lower %in% names(mapping)) {
+      return(mapping[[val_lower]])
+    } else {
+      return(NA_character_)
+    }
+  }
+
+  mapped_difficulties <- sapply(level.description$difficulty, map_difficulty, USE.NAMES = FALSE)
+  level.description$difficulty <- mapped_difficulties
+
+  # Check that all mapped values are valid.
+  if (any(is.na(level.description$difficulty))) {
+    invalid_diff <- level.description$difficulty[is.na(level.description$difficulty)]
+    stop(paste("Some difficulty values could not be mapped. Allowed values are: LOW, MEDIUM, HIGH."))
+  }
+
+  # 7. Return the validated and cleaned data frame.
+  return(level.description)
+}
+

@@ -405,6 +405,7 @@ validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, mo
 #'   the existing helper functions.
 #'
 #' @param item.difficulty A list specifying difficulty levels for each item type.
+#' @param level.description A data frame containing the columns `type`, `difficulty`, and `description`.This data frame defines what make an easy item easy, and moderate item moderate, and a challenging item challenging.
 #' @param openai.API A character string of your OpenAI API key.
 #' @param groq.API A character string of your Groq API key.
 #' @param custom A boolean indicating whether custom prompts and a cleaning function are used.
@@ -432,14 +433,14 @@ validate_promt_inputs <- function(openai.API, groq.API, user.prompts, N.runs, mo
 #' @param silently A boolean indicating whether to suppress console output.
 #'
 #' @return A list of validated parameters ready for use in p_AIGENIE.
-p_AIGENIE_checks <- function(item.difficulty, openai.API, groq.API, custom, user.prompts,
+p_AIGENIE_checks <- function(item.difficulty, level.description, openai.API, groq.API, custom, user.prompts,
                              item.type.definitions, cleaning.fun, system.role, scale.title, audience,
                              sub.domain, model, item.examples, target.N, temperature, top.p,
                              items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
                              keep.org, plot, plot.stability, calc.final.stability, silently) {
 
   # Check that none of the essential parameters are NA
-  check_no_na(item.difficulty, openai.API, groq.API, custom, user.prompts,
+  check_no_na(item.difficulty, level.description, openai.API, groq.API, custom, user.prompts,
               item.type.definitions, cleaning.fun, system.role, scale.title, audience, sub.domain, model,
               item.examples, target.N, temperature, top.p, items.only, adaptive, EGA.model, EGA.algorithm,
               embedding.model, keep.org, plot, plot.stability, calc.final.stability, silently)
@@ -496,6 +497,9 @@ p_AIGENIE_checks <- function(item.difficulty, openai.API, groq.API, custom, user
   # Validate target.N using the valid labels
   target.N <- validate_target_N(target.N, labels, items.only)
 
+  # Validate level.description
+  level.description <- validate_level_description(level.description, item.examples, item.difficulty, silently)
+
   # Validate API keys
   api_keys <- validate_api_keys(openai.API, groq.API, model)
   openai.API <- api_keys$openai.API
@@ -515,6 +519,7 @@ p_AIGENIE_checks <- function(item.difficulty, openai.API, groq.API, custom, user
   # Return a list of validated parameters
   return(list(
     item.difficulty = validated_difficulty,
+    level.description = level.description,
     openai.API = openai.API,
     groq.API = groq.API,
     custom = custom,

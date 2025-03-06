@@ -707,7 +707,7 @@ validate_prompt <- function(openai.API=NULL, groq.API = NULL,
 
 
 #' @export
-p_AIGENIE <- function(item.difficulty, openai.API, groq.API = NULL, custom = FALSE,
+p_AIGENIE <- function(item.difficulty, level.description=NULL, openai.API, groq.API = NULL, custom = FALSE,
                       user.prompts = NULL, item.type.definitions = NULL, cleaning.fun = NULL,
                       system.role = NULL, scale.title = NULL, audience = NULL, sub.domain = NULL,
                       model = "gpt3.5", item.examples = NULL, target.N = 100, temperature = 1,
@@ -717,7 +717,7 @@ p_AIGENIE <- function(item.difficulty, openai.API, groq.API = NULL, custom = FAL
                       calc.final.stability = FALSE, silently = FALSE) {
 
   # Validate and update parameters using p_AIGENIE_checks
-  validated <- p_AIGENIE_checks(item.difficulty, openai.API, groq.API, custom, user.prompts,
+  validated <- p_AIGENIE_checks(item.difficulty, level.description, openai.API, groq.API, custom, user.prompts,
                                 item.type.definitions, cleaning.fun, system.role, scale.title, audience,
                                 sub.domain, model, item.examples, target.N, temperature, top.p,
                                 items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
@@ -750,7 +750,7 @@ p_AIGENIE <- function(item.difficulty, openai.API, groq.API = NULL, custom = FAL
   plot.stability      <- validated$plot.stability
   calc.final.stability <- validated$calc.final.stability
   silently            <- validated$silently
-
+  level.description <- validated$level.description
 
   generated_items <- generate.items.internal(
     model = model,
@@ -771,10 +771,21 @@ p_AIGENIE <- function(item.difficulty, openai.API, groq.API = NULL, custom = FAL
     adaptive = adaptive,
     silently = silently,
     performance = TRUE,
-    audience = audience
+    audience = audience,
+    level.description = level.description
   )
 
+  if(!items.only){
+  # run the pipeline
+  run_pipeline <- run_pipeline(items = generated_items, EGA.model = EGA.model, EGA.algorithm= EGA.algorithm,
+                               openai.key=openai.API, embedding.model=embedding.model,
+                               labels = run_pipeline$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
+                               silently= silently, calc.final.stability = calc.final.stability)
+
+  return(run_pipeline)
+  } else {
   return(generated_items)
+  }
 }
 
 

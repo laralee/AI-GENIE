@@ -42,6 +42,7 @@
 #' @param silently Logical; if \code{TRUE}, progress and status messages are suppressed.
 #' @param performance Logical; if \code{TRUE}, the function proceeds in performance mode.
 #' @param audience String; only used in performance mode
+#' @param level.description Data frame; only used in performance mode
 #' @param ... Additional arguments passed to underlying API calls and helper functions.
 #'
 #' @return A data frame of generated items with at least the following columns:
@@ -53,7 +54,7 @@
 generate.items.internal <- function(model, temperature, top.p, groq.API, openai.API, target.N, item.attributes,
                                     scale.title, sub.domain, item.examples, system.role, user.prompts,
                                     item.type.definitions, cleaner_fun, custom, adaptive, silently,
-                                    performance = FALSE, audience = NULL, ...) {
+                                    performance = FALSE, audience = NULL, level.description = NULL, ...) {
 
   # Map model name to API-specific identifier
   model <- switch(
@@ -71,7 +72,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
   if (!custom) {
     item.types <- names(item.attributes)
     prompts <- create.prompts(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                              system.role, audience, performance)
+                              system.role, audience, performance, level.description)
     system.role <- prompts[["system.role"]]
     user.prompts <- prompts[["user.prompts"]]
 
@@ -370,8 +371,17 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
       cat("\n")
     }
   }
+
+  if(performance){
+    items_df_nd <- clean_generated_data(items_df)
+  }
+
   if (!silently) {
     cat(paste0("All items generated. Final sample size: ", nrow(items_df_nd)))
+  }
+
+  if(performance){
+    items_df_nd <- clean_generated_data(items_df)
   }
 
   return(items_df_nd)
