@@ -126,7 +126,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     examples.incl <- TRUE
   }
 
-  max_sample_size <- if (examples.incl && grepl("gpt", model)) 50 else if (examples.incl) 150 else if (grepl("gpt", model)) 75 else 200
 
   for (i in seq_along(item.types)) {
     unique_items <- character()
@@ -162,8 +161,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             }
 
             if (adaptive && length(unique_items) > 0) {
-              sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
-              previous_items_text <- paste0(sampled_items, collapse = "\n")
+              previous_items_text <- paste0(unique_items, collapse = "\n")
 
               constructed_content <- paste0(
                 user.prompts[[i]],
@@ -190,9 +188,39 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             }
 
             # API Call with Timeout using the helper function
-            R.utils::withTimeout({
-              response <- call_generate_FUN(messages_list)
-            }, timeout = 20, onTimeout = "error")
+            # Attempt API call and catch token-limit errors to disable adaptive prompting
+            try_resp <- try({
+              R.utils::withTimeout({
+                call_generate_FUN(messages_list)
+              }, timeout = 20, onTimeout = "error")
+            }, silent = TRUE)
+
+            if (inherits(try_resp, "try-error") &&
+                grepl("token limit|context length|context window|token window", conditionMessage(try_resp), ignore.case = TRUE)) {
+
+              warning(sprintf("Adaptive prompt exceeded token limit for model '%s'. Disabling adaptive mode.", model))
+              adaptive <<- FALSE  # Globally disable adaptive prompting
+
+              # Rebuild message without prior items
+              messages_list <- list(
+                list("role" = "system", "content" = system.role),
+                list("role" = "user", "content" = user.prompts[[i]])
+              )
+
+              # Retry clean prompt
+              try_resp <- try({
+                R.utils::withTimeout({
+                  call_generate_FUN(messages_list)
+                }, timeout = 20, onTimeout = "error")
+              }, silent = TRUE)
+            }
+
+            # Final fallback check
+            if (inherits(try_resp, "try-error")) {
+              stop(try_resp)
+            } else {
+              response <- try_resp
+            }
             response
           },
           error = function(e) {
@@ -239,7 +267,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
       if (!custom) {
         # Use the clean_items function to process and clean the AI-generated items
-        current_items_df <- clean_items(response, split_content, data.frame(), current_label)
+        current_items_df <- clean_items(response, split_content, data.frame(), current_label, item.attributes[[current_label]])
       } else {
         # Custom cleaning branch with retry mechanism
         max_cleaning_attempts <- 5
@@ -253,8 +281,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             Sys.sleep(runif(1, min = 1, max = 3))
             response <- tryCatch({
               if (adaptive && length(unique_items) > 0) {
-                sampled_items <- sample(unique_items, min(max_sample_size, length(unique_items)))
-                previous_items_text <- paste0(sampled_items, collapse = "\n")
+                previous_items_text <- paste0(unique_items, collapse = "\n")
                 constructed_content <- paste0(
                   user.prompts[[i]],
                   "\nDo NOT repeat or rephrase any items from this list of items you've already generated:\n",

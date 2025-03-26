@@ -37,21 +37,20 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
     if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[current_type]])) {
       definition <- item.type.definitions[[current_type]]
       definition <- substr(definition, 1, 250)
-      definition <- paste0("Definition of '", current_type, "': ", definition, "\n")
+      definition <- paste0("The precise definition of '", current_type, "' in this context is as follows: ", definition, "\n")
     }
 
     # Construct the prompt for all prompts
     user.prompts[[current_type]] <- paste0(
-      definition,
       "Generate a total of ", length(attributes) * 2, " UNIQUE, psychometrically reliable and valid ",
       ifelse(sub.domain != "Networks Before vs After AI-GENIE", sub.domain, "inventory"),
-      " items related to the characteristics of the item type '", current_type, "'. Here are the characteristics of the item type '",
-      current_type, "': ", attr_str, ". Generate EXACTLY TWO items PER characteristic." ,
-      "\nEACH item should be ONE sentence, CONCISE, and DISTINCTLY worded relative to other items.",
-      "\nFOLLOW this format EXACTLY for each item:\n<characteristic><<<<DELIM>>><item content>",
-      "\nThat is, the item's characteristic, followed by '<<<<DELIM>>>', followed by the item itself. ",
-      "This format is EXTREMELY important. Do NOT number or add ANY other text to your response.",
-      "\nUse the characteristics EXACTLY as provided. ONLY output the characteristic and item content—NOTHING else."
+      " items related to the attributes of the item type '", current_type, "'. ", definition,
+      "Here are the attributes of the item type '", current_type, "': ", attr_str,
+      ". Generate EXACTLY TWO items PER attribute. Use the attributes EXACTLY as provided; do NOT add your own or leave any out." ,
+      "\nEACH item should be CONCISE, ROBUST, and DISTINCTLY worded relative to other items. \n",
+      "Return output STRICTLY as a JSON array of objects, each with keys `attribute` and `statement`, e.g.:\n",
+      "[{\"attribute\":\"", item.attributes[[current_type]][1], "\",\"statement\":\"Your item here.\"}, …]\n",
+      "This JSON formatting is EXTREMELY important. ONLY output the items in this formatting; DO NOT include any other text in your response."
     )
   }
 
@@ -69,56 +68,69 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #' @param split_content A character vector containing stemmed characteristics to validate against.
 #' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
 #' @param current_label A string of the item type currently being examined
+#' @param valid_attributes A list of attributes that corresponds to the current item type.
 #' @return A data frame with columns:
 #' \describe{
-#'   \item{\code{type}}{The characteristic or attribute associated with each item.}
+#'   \item{\code{type}}{The general type associated with each item.}
+#'   \item{\code{attribute}}{The characteristic or attribute associated with each item.}
 #'   \item{\code{statement}}{The cleaned item statement.}
 #' }
 clean_items <- function(response, split_content,
                         current_items = data.frame("type" = NULL, "attribute"= NULL, "statement" = NULL),
-                        current_label) {
+                        current_label, valid_attributes) {
 
-  # Try different formats on the response
-  formats <- try_formats(response, split_content)
+  raw <- response$choices[[1]]$message$content
+  json_txt <- extract_json_array(raw)
 
-  # Ensure there are exactly the same number of stemmed_characteristics and items
-  if (length(formats$stemmed_characteristics) != length(formats$items))
-    { return(current_items) }
-
-  # Ensure formats are valid and not empty
-  if (all(!is.na(unlist(formats)))) {
-
-    # Remove the delimiter if it is still present
-    items <- gsub("<+DELIM>+", "", formats$items)
-    items <- gsub("<+delim>+", "", items)
-    items <- trimws(gsub("^[<>]+|[<>]+$", "", items))
-
-    attribute <- gsub("<+DELIM>+", "", formats$stemmed_characteristics)
-    attribute <- gsub("<+delim>+", "", attribute)
-    attribute <- gsub(">", "", attribute)
-    attribute <- gsub("<", "", attribute)
-    attribute <- trimws(gsub("^[<>]+|[<>]+$", "", attribute))
-
-
-    # Create a new data frame with the cleaned items
-    new_items <- data.frame(
-      type = rep(current_label, length(attribute)),
-      attribute = attribute,
-      statement = items
-    )
-
-    # Combine with current items
-    current_items <- rbind.data.frame(current_items, new_items)
-
-    # Remove punctuation and convert to lowercase for uniqueness check
-    statements <- tolower(gsub("[[:punct:]]", "", current_items$statement))
-
-    # Remove duplicates based on cleaned statements
-    current_items <- current_items[!duplicated(statements),]
+  if (!is.null(json_txt)) {
+    parsed <- tryCatch(jsonlite::fromJSON(json_txt), error = function(e) NULL)
+  } else {
+    return(current_items)
   }
+
+  if (is.null(parsed)) {
+    return(current_items)
+  }
+
+  if(!all(colnames(parsed) %in% c("statement", "attribute"))){
+    return(current_items)
+  }
+
+  # Trim whitespace from both columns
+  parsed$statement <- trimws(parsed$statement)
+  parsed$attribute <- trimws(parsed$attribute)
+
+  # Check for empty cells or NAs
+  if(any(is.na(parsed$statement)) || any(parsed$statement == "") ||
+     any(is.na(parsed$attribute)) || any(parsed$attribute == "")) {
+    return(current_items)
+  }
+
+  # Normalize attributes for comparison (trim and lowercase)
+  normalized_parsed_attr <- tolower(parsed$attribute)
+  normalized_valid_attr <- tolower(valid_attributes)
+
+  # Check that every parsed attribute is in the list of valid attributes
+  if(!all(normalized_parsed_attr %in% normalized_valid_attr)) {
+    return(current_items)
+  }
+
+  # If all validations pass, create a new data frame
+  new_items <- data.frame(
+    type      = rep(current_label, length(attribute)),
+    attribute = tolower(trimws(parsed$attribute)),
+    statement = trimws(parsed$statement),
+    stringsAsFactors = FALSE
+  )
+
+  # Combine with current items and remove duplicates (case-insensitive and punctuation removed)
+  current_items <- rbind(current_items, new_items)
+  statements <- tolower(gsub("[[:punct:]]", "", current_items$statement))
+  current_items <- current_items[!duplicated(statements),]
 
   return(current_items)
 }
+
 
 
 #' Create System Role Prompt
@@ -151,231 +163,6 @@ create.system.role.prompt <- function(system.role, item.types, scale.title, sub.
   }
 
   return(system.role)
-}
-
-
-#' Flatten Text
-#'
-#' Removes the punctuation from a string and converts it to lowercase.
-#'
-#' @param text A string that should be flattened
-flatten_text <- function(text)
-{
-  tolower(gsub("[[:punct:]]", "", text))
-}
-
-
-#' Deep Seek Output Cleaning
-#'
-#' Cleans the output text based on the expected typical output of the DeepSeek model.
-#'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed (not currently used)
-#' @returns A list of the characteristics and items extracted from the model output
-deepseek_format <- function(response, split_content) {
-
-  # Extract the response content
-  response_text <- response$choices[[1]]$message$content
-
-  # Remove <think> and other explanatory text
-  response_text <- gsub("<think>.*?</think>", "", response_text, perl = TRUE)
-
-  # Split by new lines and trim whitespace
-  items <- trimws(strsplit(response_text, "\n")[[1]])
-
-  # Remove empty lines
-  items <- items[nzchar(items)]
-
-  # Filter only properly formatted items (e.g., "trait<<<DELIM>>>statement")
-  items <- items[grepl("^[a-zA-Z]+\\s*<<<DELIM>>>\\s*", items)]
-
-  # Separate characteristics and item statements
-  characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
-  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
-
-
-  # Return extracted items
-  return(list(characteristics = characteristics, items = items))
-}
-
-
-#' Gemma 2 Output Cleaning
-#'
-#' Cleans the output text based on the expected typical output of the Gemma 2 model.
-#'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed (not currently used)
-#' @returns A list of the characteristics and items extracted from the model output
-gemma_format <- function(response, split_content)
-{
-
-  ## Clean the response so only the items are retained
-  items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-  items <- trimws(items)
-  items <- items[nzchar(items)]
-  items <- gsub("\\*", "", items)
-
-  # Separate characteristics and items
-  characteristics <- trimws(gsub("<<<DELIM>>>.*", "", items))
-  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
-
-  # Return items and characteristics
-  return(list(characteristics = characteristics, items = items))
-
-}
-
-#' Mixtral Output Cleaning
-#'
-#' Cleans the output text based on the expected typical output of the Mixtral model.
-#'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed
-#' @returns A list of the characteristics and items extracted from the model output
-mixtral_format <- function(response, split_content)
-{
-
-  ## Clean the response so only the items are retained
-  items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-  items <- trimws(items)
-  items <- items[nzchar(items)]
-  items <- gsub("\\*", "", items)
-
-  ## Characteristics index
-  characteristics_index <- tm::stemDocument(flatten_text(items)) %in% split_content
-
-  ## Get characteristics
-  characteristics <- items[characteristics_index]
-  items <- items[!characteristics_index]
-
-  # Separate characteristics and items
-  characteristics <- rep(trimws(gsub("<<<DELIM>>>.*", "", characteristics)), each = 2)
-  items <- gsub("\\-", "", items)
-  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
-
-  # Return items and characteristics
-  return(list(characteristics = characteristics, items = items))
-
-}
-
-
-#' Llama Output Cleaning
-#'
-#' Cleans the output text based on the expected typical output of the Llama model.
-#'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed
-#' @returns A list of the characteristics and items extracted from the model output
-llama_format <- function(response, split_content)
-{
-
-  ## Clean the response so only the items are retained
-  items <- as.list(strsplit(response$choices[[1]]$message$content, "\n")[[1]])
-  items <- trimws(items)
-  items <- items[nzchar(items)]
-  items <- gsub("\\*", "", items)
-
-  ## Characteristics index
-  characteristics_index <- logical(length(items))
-  for(i in seq_along(split_content)){
-
-    ## Get locations
-    locations <- grepl(split_content[i], tm::stemDocument(flatten_text(items)))
-
-    ## Update index
-    characteristics_index[locations] <- TRUE
-
-  }
-
-  # Separate characteristics and items
-  characteristics <- rep(
-    trimws(gsub("<<<DELIM>>>.*", "", items))[characteristics_index],
-    each = 2
-  )
-  items <- trimws(gsub(".*<<<DELIM>>>", "", items))
-
-  # Return items and characteristics
-  return(list(characteristics = characteristics, items = items))
-
-}
-
-#' Cleaning Function that Cleans the Outputs using All Cleaning Formats
-#'
-#' Cleans the output text based on all of the various formats (Gemma 2, DeepSeek, Mixtral, and Llama)
-#'
-#' @param response A string that contains the output of the LLM model
-#' @param split_content A vector of the item attributes stemmed
-#' @returns A list of the characteristics and items extracted from the model output if the formatting is successful. Otherwise, an empty list is returned.
-try_formats <- function(response, split_content)
-{
-  # Try DeepSeek first
-  deepseek <- deepseek_format(response, split_content)
-
-  ## Set items and characteristics
-  items <- deepseek$items
-  characteristics <- deepseek$characteristics
-
-  ## Update stems
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  # Check for errors in generation
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  # If DeepSeek parsing works, return it
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-  }
-
-  # If DeepSeek fails, fall back to existing formats
-  # Try Gemma:
-  gemma <- gemma_format(response, split_content)
-  items <- gemma$items
-  characteristics <- gemma$characteristics
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-  }
-
-  # Try Mixtral:
-  mixtral <- mixtral_format(response, split_content)
-  items <- mixtral$items
-  characteristics <- mixtral$characteristics
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-  }
-
-  # Try LLAMA-3:
-  llama <- llama_format(response, split_content)
-  items <- llama$items
-  characteristics <- llama$characteristics
-  stemmed_characteristics <- tm::stemDocument(flatten_text(characteristics))
-  stemmed_items <- tm::stemDocument(flatten_text(items))
-
-  formatting_issue <- !all(stemmed_characteristics %in% split_content) ||
-    any(stemmed_items %in% split_content) ||
-    length(characteristics) != length(items)
-
-  if(!formatting_issue){
-    return(list(stemmed_characteristics = stemmed_characteristics, items = items))
-  }
-
-  # Return empty list if nothing worked
-  return(list(stemmed_characteristics = NA, items = NA))
 }
 
 
@@ -426,48 +213,79 @@ get_embeddings <- function(items, embedding.model, dimensions = 1536, openai.key
 #' @param embedding A matrix of embeddings where each column corresponds to an item statement.
 #' @param ... Additional arguments passed to the \code{\link[EGAnet]{UVA}} function.
 #' @return A reduced data matrix with redundant items removed.
-remove_redundancies <- function(embedding, ...)
-{
+#' Remove Redundancies
+#'
+#' Performs Unique Variable Analysis (UVA) on the embeddings to remove redundant items from the item pool.
+#'
+#' @param embedding A matrix of embeddings where each column corresponds to an item statement.
+#' @param ... Additional arguments passed to the \code{\link[EGAnet]{UVA}} function.
+#' @return A reduced data matrix with redundant items removed.
+#' Remove Redundancies
+#'
+#' Performs Unique Variable Analysis (UVA) on the embeddings to remove redundant items from the item pool.
+#'
+#' @param embedding A matrix of embeddings where each column corresponds to an item statement.
+#' @param ... Additional arguments passed to the \code{\link[EGAnet]{UVA}} function.
+#' @return A reduced data matrix with redundant items removed (or the original matrix if no redundancies were found).
+remove_redundancies <- function(embedding, ...) {
 
-  # Sparsify embedding
-  percentiles <- quantile(embedding, probs = c(0.025, 0.975))
-  embedding[embedding > percentiles[1] & embedding < percentiles[2]] <- 0
+  original_embedding <- embedding  # Backup
 
-  # Increase count
-  count <- 1 # count will go back a step if entering the loop
+  apply_sparsification <- function(mat, lower, upper) {
+    q <- quantile(mat, probs = c(lower, upper))
+    mat[mat > q[1] & mat < q[2]] <- 0
+    return(mat)
+  }
 
-  # Perform UVA
-  uva <- EGAnet::UVA(embedding, ...)
+  embedding_sparse <- apply_sparsification(embedding, 0.025, 0.975)
+
+  if (all(embedding_sparse == 0)) {
+    embedding_sparse <- apply_sparsification(embedding, 0.10, 0.90)
+
+    if (all(embedding_sparse == 0)) {
+      embedding_sparse <- original_embedding
+    }
+  }
+
+  count <- 1
+  uva <- EGAnet::UVA(embedding_sparse, ...)
+
+  if (!is.null(uva) && is.null(uva$keep_remove) && is.null(uva$reduced_data)) {
+    attr(original_embedding, "UVA_count") <- 0
+    return(original_embedding)
+  }
+
+  if (!is.null(uva$keep_remove) && is.null(uva$reduced_data)) {
+    attr(original_embedding, "UVA_count") <- 0
+    return(original_embedding)
+  }
+
   previous_uva <- uva
 
-  # Start reduction
-  while(!is.null(uva$keep_remove)){
+  while (!is.null(uva$keep_remove)) {
+    if (is.null(uva$reduced_data) || ncol(uva$reduced_data) == 0) {
+      break
+    }
 
-    # Store previous
     previous_uva <- uva
+    uva <- tryCatch({
+      EGAnet::UVA(uva$reduced_data, ...)
+    }, error = function(e) {
+      break
+    })
 
-    # Perform UVA
-    uva <- EGAnet::UVA(uva$reduced_data, ...)
-
-    # Increase count
     count <- count + 1
-
   }
 
-  # Add count to previous UVA
   if (!is.null(previous_uva$reduced_data)) {
-    # Assign the count to the valid reduced_data
     attr(previous_uva$reduced_data, "UVA_count") <- count
+    return(previous_uva$reduced_data)
   } else {
-    previous_uva$reduced_data <- data.frame("type"=character(), "statement"=character())
-    attr(previous_uva$reduced_data, "UVA_count") <- 0
+    attr(original_embedding, "UVA_count") <- 0
+    return(original_embedding)
   }
-
-
-  # Return previous UVA result
-  return(previous_uva$reduced_data)
-
 }
+
 
 
 
@@ -768,6 +586,8 @@ compute_EGA <- function(items, EGA.model, EGA.algorithm, embedding, openai.key, 
   ## Items removed by UVA and number of sweeps
   uva_removed <- dim(embedding)[2] - dim(unique_items)[2]
   uva_count <- attr(unique_items, "UVA_count") - ifelse(attr(unique_items, "UVA_count") > 1, 1, 0)
+
+
 
   ### Evaluate Sparse Embedding
   after_red_sparse <- EGA.fit(data = unique_items, model = EGA.model, algorithm = EGA.algorithm,
@@ -1125,4 +945,17 @@ clean_EGA_output <- function(ega_obj, item_set) {
     item_set <- item_set[, valid_idx, drop = FALSE]
   }
   list(ega_obj = ega_obj, item_set = item_set)
+}
+
+
+
+#' Extract only the JSON array from a raw LLM response
+#'
+#' @param text Raw model output (character)
+#' @return A string containing just the JSON array, or NULL if none found
+extract_json_array <- function(text) {
+  # Regex: grab the first '[' through its matching closing ']'
+  match <- regmatches(text, regexpr("\\[\\s*\\{[\\s\\S]*\\}\\s*\\]", text, perl=TRUE))
+  if(length(match) && nzchar(match)) return(match)
+  return(NULL)
 }

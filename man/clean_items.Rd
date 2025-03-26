@@ -8,7 +8,8 @@ clean_items(
   response,
   split_content,
   current_items = data.frame(type = NULL, attribute = NULL, statement = NULL),
-  current_label
+  current_label,
+  valid_attributes
 )
 }
 \arguments{
@@ -19,11 +20,14 @@ clean_items(
 \item{current_items}{A data frame of the current items collected so far. Defaults to an empty data frame.}
 
 \item{current_label}{A string of the item type currently being examined}
+
+\item{valid_attributes}{A list of attributes that corresponds to the current item type.}
 }
 \value{
 A data frame with columns:
 \describe{
-\item{\code{type}}{The characteristic or attribute associated with each item.}
+\item{\code{type}}{The general type associated with each item.}
+\item{\code{attribute}}{The characteristic or attribute associated with each item.}
 \item{\code{statement}}{The cleaned item statement.}
 }
 }

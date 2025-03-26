@@ -13,6 +13,16 @@ remove_redundancies(embedding, ...)
 }
 \value{
 A reduced data matrix with redundant items removed.
+Remove Redundancies
+
+Performs Unique Variable Analysis (UVA) on the embeddings to remove redundant items from the item pool.
+
+A reduced data matrix with redundant items removed.
+Remove Redundancies
+
+Performs Unique Variable Analysis (UVA) on the embeddings to remove redundant items from the item pool.
+
+A reduced data matrix with redundant items removed (or the original matrix if no redundancies were found).
 }
 \description{
 Performs Unique Variable Analysis (UVA) on the embeddings to remove redundant items from the item pool.

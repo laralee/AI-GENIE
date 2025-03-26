@@ -164,64 +164,79 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
 #'   \item{\code{items}}{A cleaned and validated data frame of your item data.}
 #'   \item{\code{openai.API}}{Your validated OpenAI API key.}
 #' }
-GENIE_checks <- function(item.data, openai.API, EGA.model,EGA.algorithm, embedding.model,
-                         plot, plot.stability, calc.final.stability, silently) {
+GENIE_checks <- function(item.data, openai.API, EGA.model, EGA.algorithm,
+                         embedding.model, plot, plot.stability, calc.final.stability, silently) {
 
   # Ensure there is no missingness
-  check_no_na(item.data, openai.API, EGA.model,EGA.algorithm, embedding.model,
+  check_no_na(item.data, openai.API, EGA.model, EGA.algorithm, embedding.model,
               plot, plot.stability, calc.final.stability, silently)
 
-  # quickly validate booleans
-  if(!(plot==FALSE || plot==TRUE)){stop("'plot' must be a boolean.")}
-  if(!(silently==FALSE || silently==TRUE)){stop("'silently' must be a boolean.")}
-  if(!(plot.stability==FALSE || plot.stability==TRUE)){stop("'plot.stability' must be a boolean.")}
-  if(!(calc.final.stability==FALSE || calc.final.stability==TRUE)){stop("'calc.final.stability' must be a boolean.")}
+  # Quickly validate booleans
+  if(!(plot %in% c(TRUE, FALSE))) stop("'plot' must be a boolean.")
+  if(!(silently %in% c(TRUE, FALSE))) stop("'silently' must be a boolean.")
+  if(!(plot.stability %in% c(TRUE, FALSE))) stop("'plot.stability' must be a boolean.")
+  if(!(calc.final.stability %in% c(TRUE, FALSE))) stop("'calc.final.stability' must be a boolean.")
 
-  # Validate the EGA model
+  # Validate the EGA model and algorithm
   EGA.model <- validate_EGA_model(EGA.model)
-
-  # Validate the EGA algorithm
   EGA.algorithm <- validate_EGA_algorithm(EGA.algorithm)
 
   # Validate the embedding model
   embedding.model <- validate_embedding(embedding.model)
 
-  # validate the API
+  # Validate the API key
   openai.API <- validate_openai(openai.API)
 
+  # Ensure item.data is a data.frame or matrix
+  item.data <- validate_item_data_type(item.data, "your item data")
+
+  # Check for missing data
+  validate_no_missing_data(item.data)
+
+  # Structural column check (names + count)
+  validate_columns(item.data, "your item data")
+
+  # Ensure `statement`, `type`, `attribute` are flat character vectors
+  validate_flat_character_columns(item.data, "your item data")
+
+  # Extract and validate attributes
   item.attributes <- validate_and_extract_attributes(item.data)
 
   string <- "your provided data"
-  # Validate the different aspects of item.data
   item.labels <- item.data[["type"]]
   item.attribute.labels <- item.data[["attribute"]]
   items <- item.data[["statement"]]
+
+  # Content-level checks
   validate_non_empty_items_labels(items, item.labels, item.attribute.labels, string)
   item.data <- deduplicate_item_data(item.data, string)
   validate_no_duplicate_items(item.data, string)
   validate_items_per_type(item.data)
   validate_total_items(item.data)
 
-  # Validate item.attributes
+  # Attribute alignment check
   item.attributes <- validate_item_attributes(item.attributes, FALSE)
-
-  test <- item.attributes
-  names(test) <- NULL
-  test <- unlist(test)
+  test <- unlist(item.attributes)
+  names(item.attributes) <- NULL
   validate_item_attribute_labels <- sapply(test, function(x){x %in% item.attribute.labels})
   validate_item_type_labels <- sapply(names(item.attributes), function(x){x %in% item.labels})
 
-  if(!all(validate_item_attribute_labels)){
+  if (!all(validate_item_attribute_labels)) {
     stop("Ensure the labels in your `item.attributes` object align with the labels in your `attribute` column of the provided data frame.")
   }
 
-  if(!all(validate_item_type_labels)){
+  if (!all(validate_item_type_labels)) {
     stop("Ensure the names of the item types in your `item.attributes` object align with the labels in your `type` column of the provided data frame.")
   }
 
-  # Return the cleaned item data object
-  return(list(items = item.data, openai.API=openai.API, item.attributes = item.attributes,
-              embedding.model=embedding.model, EGA.model=EGA.model, EGA.algorithm = EGA.algorithm))
+  return(list(
+    items = item.data,
+    openai.API = openai.API,
+    item.attributes = item.attributes,
+    embedding.model = embedding.model,
+    EGA.model = EGA.model,
+    EGA.algorithm = EGA.algorithm
+  ))
 }
 
 

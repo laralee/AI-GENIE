@@ -55,11 +55,12 @@ validate_item_attributes <- function(item.attributes, items.only) {
 
     labels <- names(item.attributes)
     labels <- sapply(labels, trimws)
+    labels <- sapply(labels, tolower)
 
 
 
     if(length(labels) < length(unique(labels))){
-      stop("All item labels in `item.attributes` must be unique after trimming whitespace.")
+      stop("All item labels in `item.attributes` must be unique after trimming whitespace and converting to lowercase.")
     }
 
     names(item.attributes) <- labels
@@ -100,29 +101,19 @@ validate_item_attributes <- function(item.attributes, items.only) {
       stop("For a meaningful analysis and to ensure non-redundancy, remove duplicates from your item attributes.")
     }
 
-
-    # Check for duplicate stemmed labels within and across item types
-    stemmed_labs <- tolower(gsub("[[:punct:]]", "", labels))
-    stemmed_labs <- tm::stemDocument(stemmed_labs)
-
-    if (any(duplicated(stemmed_labs))) {
-      stop("Ensure that your item type labels are unique after word stemming.")
-    }
-
     attribute <- item.attributes
     names(attribute) <- NULL
 
     for(i in seq_along(attribute)){
+      attr <- c()
       for(j in seq_along(attribute[[i]])){
 
-        # Check for duplicate stemmed labels within and across item types
-        stemmed_attr <- tolower(gsub("[[:punct:]]", "", attribute[[i]][[j]]))
-        stemmed_attr <- tm::stemDocument(stemmed_attr)
-
-        if (any(duplicated(stemmed_attr))) {
-          stop("Ensure that all of your item attributes are unique after word stemming.")
+        # Check for duplicate labels within and across item types
+        attr <- c(tolower(gsub("[[:punct:]]", "", attribute[[i]][[j]])), attr)
         }
 
+      if (any(duplicated(attr))) {
+        stop("Ensure that all of your attributes are unique for each item type after removing punctuation and converting to lowercase.")
       }
     }
 
@@ -135,6 +126,10 @@ validate_item_attributes <- function(item.attributes, items.only) {
   if (length(labels) != length(attribute)) {
     stop("The number of labels does not match the number of attribute sets.")
   }
+
+  item.attributes <- lapply(item.attributes, tolower)
+  item.attributes <- lapply(item.attributes, trimws)
+  names(item.attributes) <- labels
 
   return(item.attributes)
 }
@@ -1001,3 +996,23 @@ validate_EGA_algorithm <- function(EGA.algorithm){
   }
   return(EGA.algorithm)
 }
+
+
+
+#' Validate Flat Character Columns
+#'
+#' Ensures that the `statement`, `type`, and `attribute` columns are atomic character vectors (not lists or factors).
+#'
+#' @param item.data A data frame containing the item pool with expected columns: `statement`, `type`, and `attribute`.
+#' @param string A descriptor for the error message context (e.g., "your item pool")
+#' @return Stops with an informative error if validation fails.
+validate_flat_character_columns <- function(item.data, string = "your data") {
+  expected <- c("statement", "type", "attribute")
+  for (col in expected) {
+    x <- item.data[[col]]
+    if (!is.character(x) || !is.atomic(x) || is.list(x)) {
+      stop(sprintf("Column `%s` in %s must be a flat character vector (not a list, factor, or expression).", col, string))
+    }
+  }
+}
+

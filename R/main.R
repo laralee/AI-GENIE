@@ -376,15 +376,6 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
       ...
     )
 
-  # change the item attributes to the appropriate, un-stemmed labels
-  names(item.attributes) <- NULL
-  item.attributes <- unlist(item.attributes)
-  item.attributes <- trimws(tolower(gsub("[[:punct:]]", "", item.attributes)))
-  stemmed_attributes <- tm::stemDocument(item.attributes)
-
-  attribute_map <- setNames(item.attributes, stemmed_attributes)
-  generated_items$attribute <- attribute_map[generated_items$attribute]
-
   if (items.only) {
     return(generated_items)
   }
