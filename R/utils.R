@@ -77,7 +77,9 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     user.prompts <- prompts[["user.prompts"]]
   } else {
     item.types <- names(user.prompts)
-    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples)
+    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain,
+                                             item.examples = ifelse(is.data.frame(item.examples), "", item.examples)
+                                             )
   }
 
   # Determine which model to use
