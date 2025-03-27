@@ -16,7 +16,7 @@
 #'   \item{\code{system.role}}{A character string for the system role prompt.}
 #' }
 create.prompts <- function(item.attributes, item.type.definitions, scale.title, sub.domain, item.examples,
-                           system.role) {
+                           system.role, audience, performance, level.description) {
   item.types <- names(item.attributes)
 
   if(is.null(item.examples)){
@@ -85,7 +85,6 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #' Cleans and parses the language model's response to extract item statements and their corresponding characteristics. This function ensures the items follow the expected format and removes duplicates.
 #'
 #' @param response The response object from the language model API call.
-#' @param split_content A character vector containing stemmed characteristics to validate against.
 #' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
 #' @param current_label A string of the item type currently being examined
 #' @param valid_attributes A list of attributes that corresponds to the current item type.
@@ -95,7 +94,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #'   \item{\code{attribute}}{The characteristic or attribute associated with each item.}
 #'   \item{\code{statement}}{The cleaned item statement.}
 #' }
-clean_items <- function(response, split_content,
+clean_items <- function(response,
                         current_items = data.frame("type" = NULL, "attribute"= NULL, "statement" = NULL),
                         current_label, valid_attributes) {
 
@@ -137,7 +136,7 @@ clean_items <- function(response, split_content,
 
   # If all validations pass, create a new data frame
   new_items <- data.frame(
-    type      = rep(current_label, length(attribute)),
+    type      = current_label,
     attribute = tolower(trimws(parsed$attribute)),
     statement = trimws(parsed$statement),
     stringsAsFactors = FALSE
