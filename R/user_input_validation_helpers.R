@@ -1,6 +1,94 @@
 # AI-GENIE Checks Helpers ----
 
 
+#' Validate and Clean User Input Data Frame
+#'
+#' Validates a user-provided data frame (`item_examples`) that should contain item definitions.
+#' The input can be `NULL`, in which case it is returned as-is. If it is a data frame, it must contain
+#' the required columns: `attribute`, `type`, and `statement` (all character type, no missing values),
+#' and may optionally include `answer`. Rows are trimmed for whitespace, deduplicated (case-insensitively),
+#' and validated against a known list of `attributes`.
+#'
+#' @param item_examples A data frame or `NULL`. If a data frame, must contain columns `attribute`, `type`, and `statement`.
+#' @param attributes A named list of character vectors. Each name corresponds to a valid `type`, and each vector contains valid `attribute` names for that type.
+#'
+#' @return A cleaned and validated data frame with fixed casing and no duplicates, or `NULL` if `item_examples` is `NULL`.
+#'
+#' @throws An error if validation fails at any step (e.g., missing columns, non-character types, invalid `type` or `attribute` values).
+validate_item_examples_df <- function(item_examples, attributes) {
+  # If input is NULL, return NULL silently
+  if (is.null(item_examples)) return(NULL)
+
+  # Check that input is a data.frame
+  if (!is.data.frame(item_examples)) {
+    stop("`item.examples` must be a data frame (recommended), list, or NULL (if choosing to omit).")
+  }
+
+  # Required columns
+  required_cols <- c("attribute", "type", "statement")
+
+  # Check required columns exist
+  missing_cols <- setdiff(required_cols, names(item_examples))
+  if (length(missing_cols) > 0) {
+    stop(paste("Missing required columns in `item.examples`:", paste(missing_cols, collapse = ", ")))
+  }
+
+  # Check that all columns are character type
+  non_char_cols <- names(item_examples)[!sapply(item_examples, is.character)]
+  if (length(non_char_cols) > 0) {
+    stop(paste("All columns in `item.examples` must be of type character. The following are not:", paste(non_char_cols, collapse = ", ")))
+  }
+
+  # Trim whitespace in all cells
+  trim <- function(x) gsub("^\\s+|\\s+$", "", x)
+  item_examples[] <- lapply(item_examples, trim)
+
+  # Check for missingness (NA, empty string, or whitespace-only)
+  has_missing <- function(x) any(is.na(x) | x == "")
+  if (any(sapply(item_examples, has_missing))) {
+    stop("`item.examples` contains missing values (NA or empty strings) after trimming.")
+  }
+
+  # Deduplicate rows (case-insensitive, whitespace-trimmed)
+  to_lower_df <- function(df) {
+    as.data.frame(lapply(df, function(col) tolower(trimws(col))), stringsAsFactors = FALSE)
+  }
+  deduped <- !duplicated(to_lower_df(item_examples))
+  item_examples <- item_examples[deduped, , drop = FALSE]
+
+  # Fix casing of `type` column to match names(attributes)
+  type_lookup <- setNames(names(attributes), tolower(names(attributes)))
+  item_examples$type_lower <- tolower(item_examples$type)
+  unmatched_types <- setdiff(item_examples$type_lower, names(type_lookup))
+  if (length(unmatched_types) > 0) {
+    stop(paste("Invalid `type` values found in `item.examples`:\n", paste(unique(unmatched_types), collapse = ", ")))
+  }
+  item_examples$type <- type_lookup[item_examples$type_lower]
+  item_examples$type_lower <- NULL
+
+  # Now fix casing of `attribute` column based on type
+  corrected_attributes <- mapply(function(attr, type) {
+    valid_attrs <- attributes[[type]]
+    attr_match <- valid_attrs[tolower(valid_attrs) == tolower(attr)]
+    if (length(attr_match) == 0) {
+      stop(paste0("Invalid `attribute` value in `item.examples`: '", attr, "' not found under type '", type, "'."))
+    }
+    return(attr_match[1])  # Return with correct casing
+  }, attr = item_examples$attribute, type = item_examples$type, USE.NAMES = FALSE)
+
+  item_examples$attribute <- corrected_attributes
+
+  if (nrow(item_examples) > 40){
+    warning("You have many rows in `item.examples`. You may run into context window limitations.")
+  }
+
+  return(item_examples)
+}
+
+
+
+
+
 #' Validate String Vector
 #'
 #' Checks if the provided input is a vector where all elements are strings (character type).
@@ -21,10 +109,19 @@ validate_title_or_domain <- function(input, input_name) {
   if (!is.character(input) && !is.null(input)) {
     stop(paste("The", input_name, "must be a string, if specified."))
   }
-  if(is.null(input)){
+  if(is.null(input) & input_name == "scale title"){
     input <- "Networks Before vs After AI-GENIE"
   }
-  return(trimws(input)) # remove leading/trailing white space
+
+  if(is.character(input)){
+    input <- trimws(input)
+
+    if(input == ""){
+      input <- NULL
+    }
+  }
+
+  return(input) # remove leading/trailing white space
 }
 
 
@@ -131,6 +228,8 @@ validate_item_attributes <- function(item.attributes, items.only) {
   item.attributes <- lapply(item.attributes, trimws)
   names(item.attributes) <- labels
 
+
+
   return(item.attributes)
 }
 
@@ -147,7 +246,7 @@ validate_item_examples <- function(item.examples, model) {
       return(NULL)
     } else {
       if (!is.list(item.examples) && !is.atomic(item.examples)) {
-        stop("'item.examples' must either be a list or a vector.")
+        stop("'item.examples' must either be a data frame (recommended), list, or NULL (if choosing to omit).")
       }
 
       if (any(sapply(item.examples, function(x){!is.character(x)}))) {
@@ -171,12 +270,12 @@ validate_item_examples <- function(item.examples, model) {
         warning("Numbering detected in example items. Please ensure your example items are plainly provided and are not formatted/labeled/numbered in any way.")
       }
 
-      max_nchar_gpt <- 800
-      max_nchar_open_source <- 1000
-      max_nchar <- ifelse(grepl("gpt", model), max_nchar_gpt, max_nchar_open_source)
+      max_nchar_gpt <- 8000
+      max_nchar_open_source <- 50000
+      max_nchar <- ifelse((grepl("gpt", model) || grepl("o1", model) || grepl("o2", model)), max_nchar_gpt, max_nchar_open_source)
       char <- nchar(item.examples.str)
       if (char > max_nchar) {
-        stop(paste("'item.examples' must be less than", max_nchar, "characters for the", model, "model. The combination of all item strings provided has a total of", char, "characters."))
+        warning(paste("Lengthy 'item.examples' detected. You may run into context window limitations."))
       }
 
       return(paste0(item.examples, collapse = "\n"))
@@ -1016,3 +1115,4 @@ validate_flat_character_columns <- function(item.data, string = "your data") {
   }
 }
 
+# ----

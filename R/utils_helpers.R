@@ -19,8 +19,12 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
                            system.role) {
   item.types <- names(item.attributes)
 
-  system.role <- create.system.role.prompt(system.role, item.types, scale.title,
-                                           sub.domain, item.examples)
+  if(is.null(item.examples)){
+    item.examples <- ""
+  }
+
+  system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain,
+                  item.examples = ifelse(is.data.frame(item.examples), "", item.examples))
 
   user.prompts <- list()
 
@@ -36,23 +40,39 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
     definition <- ""
     if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[current_type]])) {
       definition <- item.type.definitions[[current_type]]
-      definition <- substr(definition, 1, 250)
       definition <- paste0("The precise definition of '", current_type, "' in this context is as follows: ", definition, "\n")
+    }
+
+    if(is.data.frame(item.examples)){
+      examples_str <- construct_item_examples_string(item.examples, current_type)
+    } else {
+      examples_str <- NULL
+    }
+
+    this_scale_title <- scale.title
+    if(this_scale_title == "Networks Before vs After AI-GENIE"){
+      this_scale_title <- NULL
     }
 
     # Construct the prompt for all prompts
     user.prompts[[current_type]] <- paste0(
-      "Generate a total of ", length(attributes) * 2, " UNIQUE, psychometrically reliable and valid ",
-      ifelse(sub.domain != "Networks Before vs After AI-GENIE", sub.domain, "inventory"),
-      " items related to the attributes of the item type '", current_type, "'. ", definition,
+      "Generate a grand total of ", length(attributes) * 2, " novel, UNIQUE, reliable, and valid ",
+      ifelse(!is.null(sub.domain), paste0(sub.domain, " "), ""),
+      "items",ifelse(is.null(this_scale_title), " for a scale. ", paste0(" for a scale called '", this_scale_title, ".' ")),
+      "Write items related to the attributes of the item type '", current_type, ".' ", definition,
       "Here are the attributes of the item type '", current_type, "': ", attr_str,
       ". Generate EXACTLY TWO items PER attribute. Use the attributes EXACTLY as provided; do NOT add your own or leave any out." ,
       "\nEACH item should be CONCISE, ROBUST, and DISTINCTLY worded relative to other items. \n",
       "Return output STRICTLY as a JSON array of objects, each with keys `attribute` and `statement`, e.g.:\n",
       "[{\"attribute\":\"", item.attributes[[current_type]][1], "\",\"statement\":\"Your item here.\"}, …]\n",
-      "This JSON formatting is EXTREMELY important. ONLY output the items in this formatting; DO NOT include any other text in your response."
+      "This JSON formatting is EXTREMELY important. ONLY output the items in this formatting; DO NOT include any other text in your response.",
+      ifelse(is.null(examples_str), "", paste0("\n\nHere are some EXAMPLE high-quality items that already exist on the scale that you can",
+            " emulate in terms of QUALITY ONLY; since we want NOVEL items, do NOT rephrase/copy any of these examples.\n", examples_str
+        )
+      )
     )
   }
+
 
   return(list(user.prompts = user.prompts, system.role = system.role))
 }
@@ -145,15 +165,19 @@ clean_items <- function(response, split_content,
 #' @return A character string containing the system role prompt for the language model.
 create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples) {
   # add default system role if none was provided
+
+  if(item.examples == ""){
+    item.examples <- NULL
+  }
+
   if(is.null(system.role)){
 
     system.role <- paste0(
-      "You are an expert psychometrician and test developer",
-      ifelse(sub.domain != "Networks Before vs After AI-GENIE",
-             paste0(" specializing in ", sub.domain, "."),"."),
-      " Your task is to create high-quality, psychometrically robust items",
+      "You are an expert measurement methodologist; more specifically, you are an accomplished, well-trained, and knowledgeable scale-developer",
+      ifelse(!is.null(sub.domain), paste0(" specializing in ", sub.domain, "."),"."),
+      " Your task is to create novel, high-quality, and robust items for a new inventory",
       ifelse(scale.title != "Networks Before vs After AI-GENIE",
-             paste0(" for an inventory called '", scale.title, ".'"), "."))
+             paste0(" called '", scale.title, ".'"), "."))
   }
 
   if(!is.null(item.examples)){
@@ -958,4 +982,43 @@ extract_json_array <- function(text) {
   match <- regmatches(text, regexpr("\\[\\s*\\{[\\s\\S]*\\}\\s*\\]", text, perl=TRUE))
   if(length(match) && nzchar(match)) return(match)
   return(NULL)
+}
+
+
+
+#' Construct Formatted String of Example Items
+#'
+#' Given a validated item examples data frame, this function constructs
+#' a string of well-formatted example items grouped by `attribute`, for a given `type`.
+#'
+#' @param item_examples A validated data frame of item examples (output of `validate_item_examples_df()`).
+#' @param current_type A character scalar indicating the type of items to include in the string.
+#'
+#' @return A character string with grouped and formatted item examples.
+construct_item_examples_string <- function(item_examples, current_type) {
+  # Filter to rows matching the current_type
+  filtered <- item_examples[item_examples$type == current_type, , drop = FALSE]
+  if (nrow(filtered) == 0) return(NULL)
+
+  # Check if 'answer' column is present
+  has_answer <- "answer" %in% names(filtered)
+
+  # Construct formatted example strings
+  examples <- if (has_answer) {
+    paste0(filtered$statement, " (Answer: ", filtered$answer, ")")
+  } else {
+    filtered$statement
+  }
+
+  # Split by attribute
+  split_by_attr <- split(examples, filtered$attribute)
+
+  # Construct attribute-level strings
+  attr_strings <- mapply(function(attr, exs) {
+    paste0("Well-written '", attr, "' items:\n", paste0(exs, collapse = "\n"))
+  }, attr = names(split_by_attr), exs = split_by_attr, USE.NAMES = FALSE)
+
+  # Combine with newlines
+  final_output <- paste(attr_strings, collapse = "\n\n")
+  return(final_output)
 }

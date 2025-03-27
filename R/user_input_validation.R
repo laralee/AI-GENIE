@@ -111,7 +111,11 @@ AIGENIE_checks <- function(item.attributes, openai.API, groq.API, custom,
   model <- validate_model(model, silently)
 
   # Validate item.examples
-  item.examples <- validate_item_examples(item.examples, model)
+  if(is.data.frame(item.examples)){
+    item.examples <- validate_item_examples_df(item.examples, item.attributes)
+  } else {
+    item.examples <- validate_item_examples(item.examples, model)
+  }
 
   # Validate target.N
   target.N <- validate_target_N(target.N, labels, items.only)

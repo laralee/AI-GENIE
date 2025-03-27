@@ -355,6 +355,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
   calc.final.stability <- validated_params$calc.final.stability
   silently <- validated_params$silently
 
+
     generated_items <- generate.items.internal(
       model = model,
       temperature = temperature,
