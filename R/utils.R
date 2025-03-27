@@ -123,11 +123,6 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
   items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
 
-  if (!custom) {
-    split_content <- tm::stemDocument(unlist(item.attributes))
-    split_content <- tolower(gsub("[[:punct:]]", "", split_content))
-    # Duplicate attribute check is already handled in validate_item_attributes
-  }
 
   if (is.null(item.examples)) {
     examples.incl <- FALSE
@@ -276,7 +271,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
       if (!custom) {
         # Use the clean_items function to process and clean the AI-generated items
-        current_items_df <- clean_items(response, split_content, data.frame(), current_label, item.attributes[[current_label]])
+        current_items_df <- clean_items(response, data.frame(), current_label, item.attributes[[current_label]])
       } else {
         # Custom cleaning branch with retry mechanism
         max_cleaning_attempts <- 5
