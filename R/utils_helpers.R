@@ -30,12 +30,13 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
                   item.examples = ifelse(is.data.frame(item.examples), "", item.examples),
                   audience, performance)
 
-  return(system.role)
 
   user.prompts <- list()
 
   # Create user prompts
+
   for (i in seq_along(item.types)) {
+    if(!performance){
     current_type <- item.types[[i]]
     attributes <- item.attributes[[current_type]]
 
@@ -76,8 +77,106 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
             " emulate in terms of QUALITY ONLY; since we want NOVEL items, do NOT rephrase/copy any of these examples.\n", examples_str
         )
       )
-    )
-  }
+    ) } else {
+      current_type <- item.types[[i]]
+      attributes <- item.attributes[[current_type]]
+
+      definition <- ""
+      if (!is.null(item.type.definitions) && !is.null(item.type.definitions[[current_type]])) {
+        definition <- item.type.definitions[[current_type]]
+        definition <- paste0("The precise definition of '", current_type, "' in this context is as follows: ", definition, "\n")
+      }
+
+      if(is.data.frame(item.examples)){
+        examples_str <- construct_item_examples_string(item.examples, current_type)
+      } else {
+        examples_str <- NULL
+      }
+
+      this_scale_title <- scale.title
+      if(this_scale_title == "Networks Before vs After AI-GENIE"){
+        this_scale_title <- NULL
+      }
+
+
+      # If level.description is provided, extract the definitions for the current item type.
+      if (!is.null(level.description)) {
+        # Assume level.description has been validated and has columns "type", "difficulty", and "description"
+        ld <- level.description[tolower(level.description$type) == tolower(current_type), ]
+        # Drop duplicates and trim whitespace (should already be done by the validator)
+        ld <- ld[!duplicated(ld), ]
+
+        # Build definitions_text from the provided data frame.
+        # We assume that the "difficulty" values are already mapped to one of "LOW", "MEDIUM", or "HIGH".
+        definitions_text <- paste(
+          sapply(unique(ld$difficulty), function(diff) {
+            paste0(diff, " difficulty items: ", ld$description[ld$difficulty == diff])
+          }),
+          collapse = "\n"
+        )
+      } else {
+        # Build dynamic definitions for difficulty levels based on the default approach.
+        difficulty_defs <- c()
+        if ("LOW" %in% attributes) {
+          difficulty_defs <- c(difficulty_defs,
+                               paste0("LOW difficulty items are those that almost all ", ifelse(is.null(audience) || audience == "", "users", audience), " can quickly solve. ",
+                                      "That is, even ", ifelse(is.null(audience) || audience == "", "users", audience), " who have a low ability will likely solve this item. These items are easy."))
+        }
+        if ("MEDIUM" %in% attributes) {
+          difficulty_defs <- c(difficulty_defs,
+                               paste0("MEDIUM difficulty items are those that about half of ", ifelse(is.null(audience) || audience == "", "users", audience),
+                                      " can solve, while about half cannot in a relatively short time frame. ",
+                                      "That is, ", ifelse(is.null(audience) || audience == "", "users", audience), " with below average or average ability will struggle with these items. These items are moderately challenging."))
+        }
+        if ("HIGH" %in% attributes) {
+          difficulty_defs <- c(difficulty_defs,
+                               paste0("HIGH difficulty items are those that almost all ", ifelse(is.null(audience) || audience == "", "users", audience),
+                                      " cannot solve in a relatively short time frame. ",
+                                      "These items may prove challenging even for ", ifelse(is.null(audience) || audience == "", "users", audience), " with extremely high ability. These items are very challenging."))
+        }
+        definitions_text <- paste(difficulty_defs, collapse = "\n")
+      }
+
+      # Build dynamic ordering instructions based on which levels are present.
+      ordering_instructions <- ""
+      if ("LOW" %in% attributes && "MEDIUM" %in% attributes && "HIGH" %in% attributes) {
+        ordering_instructions <- "The LOW difficulty items must be noticeably simpler than the MEDIUM difficulty items, and the MEDIUM items must be noticeably simpler than the HIGH difficulty items."
+      } else if ("LOW" %in% attributes && "MEDIUM" %in% attributes) {
+        ordering_instructions <- "The LOW difficulty items must be noticeably simpler than the MEDIUM difficulty items."
+      } else if ("MEDIUM" %in% attributes && "HIGH" %in% attributes) {
+        ordering_instructions <- "The MEDIUM difficulty items must be noticeably simpler than the HIGH difficulty items."
+      }
+
+      # Build attributes string
+      attr_str <- paste(attributes, collapse = ", ")
+
+      user.prompts[[current_type]] <-paste0(
+        "Generate a grand total of ", length(attributes) * 4, " novel, UNIQUE, reliable, and valid ",
+        ifelse(!is.null(sub.domain), paste0(sub.domain, " "), ""),
+        "items",ifelse(is.null(this_scale_title), " for a performance-based scale. ", paste0(" for a performance-based scale called '", this_scale_title, ".' ")),
+        "As such, these items should assess one’s ability level",
+        ifelse(is.null(sub.domain), ".", paste0(" in the subject of ", sub.domain, ".")), " More specifically, you will design '", current_type , "' items.", definition,
+        ifelse(is.null(audience), "", paste0(" Design these items for ", audience, ".")), " Only generate items at the following difficult levels: ", attr_str,
+        "\n\n To summarize, you will focus on generating '",current_type,"' items meant to distinguish between ",
+        ifelse(is.null(audience), "users", audience),
+        " who have distinctly different ability levels (",attr_str,").",
+        "\n\n",
+        # Insert difficulty definitions (from level.description if provided; otherwise, dynamic defaults)
+        "Difficulty Definitions:\n", definitions_text, "\n\n",
+        "Do NOT create any items that fall between or outside these clearly defined levels.",
+        " Generate EXACTLY FOUR items PER difficulty level. Use the difficulty levels EXACTLY as provided; do NOT add your own or leave any out." ,
+        "\nEACH item should be ROBUST and DISTINCTLY worded relative to other items. \n",
+        "Return output STRICTLY as a JSON array of objects, each with keys `difficulty`, `statement`, and `answer`. E.g.:\n",
+        "[{\"difficulty\":\"", item.attributes[[current_type]][1], "\",\"statement\":\"Your item here.\",\"answer\":\"The correct answer to your item here.\"}, …]\n",
+        "This JSON formatting is EXTREMELY important. ONLY output the items in this formatting; DO NOT include any other text in your response.",
+        ifelse(is.null(examples_str), "", paste0("\n\nHere are some EXAMPLE high-quality items that already exist on the scale that you can",
+                                                 " emulate in terms of QUALITY ONLY; since we want NOVEL items, do NOT rephrase/copy any of these examples.\n", examples_str
+        )
+        )
+      )
+
+
+    }}
 
 
   return(list(user.prompts = user.prompts, system.role = system.role))
@@ -91,7 +190,6 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #' Cleans and parses the language model's response to extract item statements and their corresponding characteristics. This function ensures the items follow the expected format and removes duplicates.
 #'
 #' @param response The response object from the language model API call.
-#' @param split_content A character vector containing stemmed characteristics to validate against.
 #' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
 #' @param current_label A string of the item type currently being examined
 #' @param valid_attributes A list of attributes that corresponds to the current item type.
@@ -101,7 +199,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #'   \item{\code{attribute}}{The characteristic or attribute associated with each item.}
 #'   \item{\code{statement}}{The cleaned item statement.}
 #' }
-clean_items <- function(response, split_content,
+clean_items <- function(response,
                         current_items = data.frame("type" = NULL, "attribute"= NULL, "statement" = NULL),
                         current_label, valid_attributes) {
 
@@ -1037,8 +1135,12 @@ construct_item_examples_string <- function(item_examples, current_type) {
     filtered$statement
   }
 
-  # Split by attribute
+  # Split by attribute/difficulty level
+  if("attribute" %in% colnames(filtered)){
   split_by_attr <- split(examples, filtered$attribute)
+  } else {
+    split_by_attr <- split(examples, filtered$difficulty)
+  }
 
   # Construct attribute-level strings
   attr_strings <- mapply(function(attr, exs) {

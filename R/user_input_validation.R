@@ -481,10 +481,11 @@ p_AIGENIE_checks <- function(item.difficulty, level.description, openai.API, gro
   # Validate item.examples if provided (for performance items, it must be a data frame)
   if (!is.null(item.examples)) {
     item.examples <- validate_item_examples_p(item.examples, valid.types = labels)
+    names(item.examples)[names(item.examples) == "difficulty"] <- "attribute"
+    item.examples <- validate_item_examples_df(item.examples, validated_difficulty)
+    names(item.examples)[names(item.examples) == "attribute"] <- "difficulty"
   }
-  names(item.examples)[names(item.examples) == "difficulty"] <- "attribute"
-  item.examples <- validate_item_examples_df(item.examples, validated_difficulty)
-  names(item.examples)[names(item.examples) == "attribute"] <- "difficulty"
+
 
   # Validate target.N using the valid labels
   target.N <- validate_target_N(target.N, labels, items.only)
