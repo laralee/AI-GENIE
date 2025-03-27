@@ -698,6 +698,84 @@ validate_prompt <- function(openai.API=NULL, groq.API = NULL,
 }
 
 
+#' @export
+p_AIGENIE <- function(item.difficulty, level.description=NULL, openai.API, groq.API = NULL, custom = FALSE,
+                      user.prompts = NULL, item.type.definitions = NULL, cleaning.fun = NULL,
+                      system.role = NULL, scale.title = NULL, audience = NULL, sub.domain = NULL,
+                      model = "gpt3.5", item.examples = NULL, target.N = 100, temperature = 1,
+                      top.p = 1, items.only = FALSE, adaptive = TRUE, EGA.model = NULL,
+                      EGA.algorithm = "walktrap", embedding.model = "text-embedding-3-small",
+                      keep.org = FALSE, plot = TRUE, plot.stability = FALSE,
+                      calc.final.stability = FALSE, silently = FALSE) {
 
+  # Validate and update parameters using p_AIGENIE_checks
+  validated <- p_AIGENIE_checks(item.difficulty, level.description, openai.API, groq.API, custom, user.prompts,
+                                item.type.definitions, cleaning.fun, system.role, scale.title, audience,
+                                sub.domain, model, item.examples, target.N, temperature, top.p,
+                                items.only, adaptive, EGA.model, EGA.algorithm, embedding.model,
+                                keep.org, plot, plot.stability, calc.final.stability, silently)
 
+  # Reassign validated parameters to local variables
+  item.difficulty     <- validated$item.difficulty
+  openai.API          <- validated$openai.API
+  groq.API            <- validated$groq.API
+  custom              <- validated$custom
+  user.prompts        <- validated$user.prompts
+  item.type.definitions <- validated$item.type.definitions
+  cleaning.fun        <- validated$cleaning.fun
+  system.role         <- validated$system.role
+  scale.title         <- validated$scale.title
+  audience            <- validated$audience
+  sub.domain          <- validated$sub.domain
+  model               <- validated$model
+  item.examples       <- validated$item.examples
+  target.N            <- validated$target.N
+  temperature         <- validated$temperature
+  top.p               <- validated$top.p
+  items.only          <- validated$items.only
+  adaptive            <- validated$adaptive
+  EGA.model           <- validated$EGA.model
+  EGA.algorithm       <- validated$EGA.algorithm
+  embedding.model     <- validated$embedding.model
+  keep.org            <- validated$keep.org
+  plot                <- validated$plot
+  plot.stability      <- validated$plot.stability
+  calc.final.stability <- validated$calc.final.stability
+  silently            <- validated$silently
+  level.description <- validated$level.description
 
+  return(generated_items <- generate.items.internal(
+    model = model,
+    temperature = temperature,
+    top.p = top.p,
+    groq.API = groq.API,
+    openai.API = openai.API,
+    target.N = target.N,
+    item.attributes = item.difficulty,
+    scale.title = scale.title,
+    sub.domain = sub.domain,
+    item.examples = item.examples,
+    system.role = system.role,
+    user.prompts = user.prompts,
+    item.type.definitions = item.type.definitions,
+    cleaner_fun = cleaning.fun,
+    custom = custom,
+    adaptive = adaptive,
+    silently = silently,
+    performance = TRUE,
+    audience = audience,
+    level.description = level.description
+  ))
+
+  if(!items.only){
+    # run the pipeline
+    run_pipeline <- run_pipeline(items = generated_items, EGA.model = EGA.model, EGA.algorithm= EGA.algorithm,
+                                 openai.key=openai.API, embedding.model=embedding.model,
+                                 labels = run_pipeline$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
+                                 silently= silently, calc.final.stability = calc.final.stability)
+
+    return(run_pipeline)
+  } else {
+    return(generated_items)
+  }
+}

@@ -40,6 +40,9 @@
 #' @param custom Logical; if \code{TRUE}, user-supplied prompts and cleaning function are used. Defaults to \code{FALSE}.
 #' @param adaptive Logical; if \code{TRUE}, previously generated items are incorporated into subsequent API calls to reduce redundancy.
 #' @param silently Logical; if \code{TRUE}, progress and status messages are suppressed.
+#' @param performance Logical; if \code{TRUE}, the function proceeds in performance mode.
+#' @param audience String; only used in performance mode
+#' @param level.description Data frame; only used in performance mode
 #' @param ... Additional arguments passed to underlying API calls and helper functions.
 #'
 #' @return A data frame of generated items with at least the following columns:
@@ -50,7 +53,8 @@
 #' Duplicate items are removed prior to returning the final data frame.
 generate.items.internal <- function(model, temperature, top.p, groq.API, openai.API, target.N, item.attributes,
                                     scale.title, sub.domain, item.examples, system.role, user.prompts,
-                                    item.type.definitions, cleaner_fun, custom, adaptive, silently, ...) {
+                                    item.type.definitions, cleaner_fun, custom, adaptive, silently,
+                                    performance = FALSE, audience = NULL, level.description = NULL, ...) {
 
   # Switch model name to the correct name in the API
   model <- switch(
@@ -72,12 +76,15 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
     prompts <- create.prompts(item.attributes=item.attributes, item.type.definitions=item.type.definitions,
                               scale.title=scale.title, sub.domain=sub.domain, item.examples=item.examples,
-                              system.role=system.role)
+                              system.role=system.role, audience, performance, level.description)
+    return(prompts)
     system.role <- prompts[["system.role"]]
     user.prompts <- prompts[["user.prompts"]]
   } else {
     item.types <- names(user.prompts)
-    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain, item.examples)
+    system.role <- create.system.role.prompt(system.role, item.types, scale.title, sub.domain,
+                                             item.examples = ifelse(is.data.frame(item.examples), "", item.examples),
+                                             audience, performance)
   }
 
   # Determine which model to use
