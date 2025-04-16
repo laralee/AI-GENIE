@@ -253,8 +253,19 @@ GENIE_checks <- function(item.data, openai.API, EGA.model, EGA.algorithm,
 #' @param output The output object returned by the user-provided \code{cleaning.fun} function.
 #' @param n_empty The number of times the cleaning function failed to return any valid items
 #' @param item_attributes A named list containing item type labels and their corresponding attributes.
+#' @param performance A flag denoting whether we are in performance mode or not
 #' @return A list containing the character vector of cleaned item statements, the character vector containing the cleaned item attributes, and the number of items the cleaning function failed to return viable output consecutively.
-validate_return_object <- function(output, n_empty, item_attributes) {
+#AI GENIE Custom----
+#' Validate Return Object from Cleaning Function (List Version)
+#'
+#' Validates the output of the user-provided text cleaning function (\code{cleaning.fun}) to ensure it returns a list of cleaned items. This function checks that the output is a list of character strings, contains no missing or empty values, and correctly formats the item data by associating each item with its corresponding type.
+#'
+#' @param output The output object returned by the user-provided \code{cleaning.fun} function.
+#' @param n_empty The number of times the cleaning function failed to return any valid items
+#' @param item_attributes A named list containing item type labels and their corresponding attributes.
+#' @param performance a logical flag indicating whether we are in performance mode
+#' @return A list containing the character vector of cleaned item statements, the character vector containing the cleaned item attributes (and the item answers in performance mode), and the number of items the cleaning function failed to return viable output consecutively.
+validate_return_object <- function(output, n_empty, item_attributes, performance) {
   string <- "output of the provided text cleaning function"
 
   # Check if output is a data frame
@@ -262,19 +273,50 @@ validate_return_object <- function(output, n_empty, item_attributes) {
     stop(paste("The", string, "must be a data frame of cleaned items."))
   }
 
-  if(ncol(output) != 2 || !("item" %in% colnames(output)) || !("attribute" %in% colnames(output))) {
-    stop(paste("The", string, "must be a data frame with two columns: one named `item` and one named `attribute`."))
+  if (performance) {
+    # In performance mode, expect three columns: item, difficulty, and answer.
+    if (ncol(output) != 3 ||
+        !("item" %in% colnames(output)) ||
+        !("difficulty" %in% colnames(output)) ||
+        !("answer" %in% colnames(output))) {
+      stop(paste("The", string, "must be a data frame with three columns: one named `item`, one named `difficulty`, and one named `answer`."))
+    }
+
+    names(output)[names(output) == "difficulty"] <- "attribute"
+
+  } else {
+    # Regular mode: expect two columns: item and attribute.
+    if (ncol(output) != 2 ||
+        !("item" %in% colnames(output)) ||
+        !("attribute" %in% colnames(output))) {
+      stop(paste("The", string, "must be a data frame with two columns: one named `item` and one named `attribute`."))
+    }
   }
 
+  # Convert numeric values to strings in performance mode for both item and answer columns
+  if (performance) {
+    if (!all(sapply(output$item, is.character))) {
+      output$item <- as.character(output$item)
+    }
+    if (!all(sapply(output$answer, is.character))) {
+      output$answer <- as.character(output$answer)
+    }
+  }
 
-  # Ensure all elements in the data frame are character strings
+  # Ensure all elements in the relevant columns are character strings
   if (!all(sapply(output$item, is.character)) || !all(sapply(output$attribute, is.character))) {
     stop(paste("All cells in the", string, "must be character strings."))
+  }
+
+  # For performance mode, also ensure all cells in the answer column are character strings
+  if (performance && !all(sapply(output$answer, is.character))) {
+    stop(paste("All cells in the answer column of the", string, "must be character strings."))
   }
 
   # Identify and clean the item attributes
   found_item_attributes <- output$attribute
   stemmed_found_attributes <- tm::stemDocument(trimws(tolower(gsub("[[:punct:]]", "", found_item_attributes))))
+
   names(item_attributes) <- NULL
   item_attributes <- unlist(item_attributes)
   item_attributes <- trimws(tolower(gsub("[[:punct:]]", "", item_attributes)))
@@ -303,11 +345,14 @@ validate_return_object <- function(output, n_empty, item_attributes) {
     stop("No valid items were returned by the cleaning function after 50 consecutive attempts. Check function logic.")
   }
 
-
   items <- output$item[valid_indices]
   item_attributes <- stemmed_found_attributes[valid_indices]
 
-  return(list(items=items, item_attributes=item_attributes, n_empty=n_empty))
+  if(performance){
+  names(output)[names(output) == "attribute"] <- "difficulty"
+  }
+
+  return(list(items = items, item_attributes = item_attributes, n_empty = n_empty))
 }
 
 

@@ -77,7 +77,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     prompts <- create.prompts(item.attributes=item.attributes, item.type.definitions=item.type.definitions,
                               scale.title=scale.title, sub.domain=sub.domain, item.examples=item.examples,
                               system.role=system.role, audience, performance, level.description)
-    return(prompts)
+
     system.role <- prompts[["system.role"]]
     user.prompts <- prompts[["user.prompts"]]
   } else {
@@ -121,7 +121,13 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     do.call(generate_FUN, call_params)
   }
 
-  items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+  # Initialize the overall data frame.
+  # In performance mode, include an extra column "answer".
+  if (performance) {
+    items_df <- data.frame("type" = character(), "statement" = character(), "answer" = character(), stringsAsFactors = FALSE)
+  } else {
+    items_df <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+  }
 
 
   if (is.null(item.examples)) {
@@ -133,7 +139,12 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
   for (i in seq_along(item.types)) {
     unique_items <- character()
-    items_df_medium <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+    if (performance) {
+      items_df_medium <- data.frame("type" = character(), "statement" = character(), "answer" = character(), stringsAsFactors = FALSE)
+    } else {
+      items_df_medium <- data.frame("type" = character(), "statement" = character(), stringsAsFactors = FALSE)
+    }
+
     current_label <- item.types[[i]]
 
     # Print "Generating items for..." message
@@ -271,7 +282,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
       if (!custom) {
         # Use the clean_items function to process and clean the AI-generated items
-        current_items_df <- clean_items(response, data.frame(), current_label, item.attributes[[current_label]])
+        current_items_df <- clean_items(response, data.frame(), current_label, item.attributes[[current_label]], performance)
       } else {
         # Custom cleaning branch with retry mechanism
         max_cleaning_attempts <- 5
@@ -310,7 +321,8 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 
           cleaning_result <- tryCatch({
             output <- cleaner_fun(response$choices[[1]]$message$content)
-            validate_output <- validate_return_object(output, n_empty, item.attributes)
+            # Validate output with performance flag passed along.
+            validate_output <- validate_return_object(output, n_empty, item.attributes, performance = performance)
             list(success = TRUE, validate_output = validate_output)
           }, error = function(e) {
             list(success = FALSE, error = e)
@@ -322,6 +334,14 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
             cleaned_items <- validate_output[["items"]]
             n_empty <- validate_output[["n_empty"]]
             cleaned_item_attributes <- validate_output[["item_attributes"]]
+
+            if (performance) {
+              # In performance mode, extract the answers from the output.
+              # Assumes the user-supplied cleaning function returns a data frame with an "answer" column.
+              cleaned_answers <- cleaning_result$output$answer
+            }
+
+
           } else {
             cleaning_attempt <- cleaning_attempt + 1
             if (cleaning_attempt > max_cleaning_attempts) {
@@ -330,9 +350,22 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
           }
         }
 
-        current_items_df <- data.frame(type = rep(current_label, length(cleaned_items)),
-                                       attribute = cleaned_item_attributes,
-                                       statement = cleaned_items)
+        if (performance) {
+          current_items_df <- data.frame(
+            type = rep(current_label, length(cleaned_items)),
+            attribute = cleaned_item_attributes,
+            statement = cleaned_items,
+            answer = cleaned_answers,
+            stringsAsFactors = FALSE
+          )
+        } else {
+          current_items_df <- data.frame(
+            type = rep(current_label, length(cleaned_items)),
+            attribute = cleaned_item_attributes,
+            statement = cleaned_items,
+            stringsAsFactors = FALSE
+          )
+        }
       }
 
       # Ensure all whitespace is trimmed
@@ -394,6 +427,9 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
     }
   }
 
+  if (performance) {
+    items_df$answer <- trimws(gsub('[\"\\\']', "", items_df$answer))
+  }
   items_df$statement <- trimws(gsub('[\"\\\']', "", items_df$statement))
   rownames(items_df) <- NULL
 
@@ -467,6 +503,7 @@ generate.items.internal <- function(model, temperature, top.p, groq.API, openai.
 #' @param plot.stability Logical; if \code{TRUE}, additional stability plots (from bootEGA) are generated.
 #' @param calc.final.stability Logical; if \code{TRUE}, final bootstrapped stability analysis is performed.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
+#' @param performance Logical; a flag denoting if we are in performance mode or not
 #' @param ... Additional arguments passed to underlying functions.
 #'
 #' @return A list with two components:
@@ -513,7 +550,8 @@ run_pipeline <- function(items, openai.key,
                          embedding.model,
                          keep.org = FALSE,
                          plot = TRUE, plot.stability = FALSE, calc.final.stability,
-                         silently = FALSE, ...){
+                         silently = FALSE, performance = FALSE,
+                         ...){
 
 
 
@@ -524,7 +562,7 @@ run_pipeline <- function(items, openai.key,
   item_level_results <- setNames(vector("list", length(item_type_names)), item_type_names)
 
   all_embeds <- data.frame(matrix(NA, nrow = 1536, ncol = 0))
-  all_truth <- items$attribute
+  all_truth <- paste0(items$attribute, items$type)
   embeddings_reduced <- data.frame(matrix(NA, nrow = 1536, ncol = 0))
   items_reduced <- data.frame(matrix(NA, ncol = 3, nrow = 0))
   truth_reduced <- c()
@@ -539,7 +577,8 @@ run_pipeline <- function(items, openai.key,
                          EGA.algorithm=EGA.algorithm,
                          embedding.model = embedding.model,
                          openai.key = openai.key, item_type=item_type,
-                         keep.org=keep.org,silently = silently)
+                         keep.org=keep.org,silently = silently,
+                         performance = performance)
   curr_embeds <- results[["embeddings"]]
   results <- results[["result"]]
 
@@ -553,8 +592,7 @@ run_pipeline <- function(items, openai.key,
   embeddings_reduced <- cbind(results$embeddings, embeddings_reduced)
 
   items_reduced <- rbind(curr_items, items_reduced)
-  truth_reduced <- c(curr_items$attribute, truth_reduced)
-
+  truth_reduced <- c(paste0(curr_items$attribute, curr_items$type), truth_reduced)
 
   if (keep.org) {
     results[["original_items"]] <- items[trait_type_indices[[i]],]

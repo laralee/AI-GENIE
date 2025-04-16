@@ -69,12 +69,15 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
       "Write items related to the attributes of the item type '", current_type, ".' ", definition,
       "Here are the attributes of the item type '", current_type, "': ", attr_str,
       ". Generate EXACTLY TWO items PER attribute. Use the attributes EXACTLY as provided; do NOT add your own or leave any out." ,
-      "\nEACH item should be CONCISE, ROBUST, and DISTINCTLY worded relative to other items. \n",
+      "\nEACH item should be ROBUST, NOVEL, and UNIQUE. This items must be top-quality.\n",
       "Return output STRICTLY as a JSON array of objects, each with keys `attribute` and `statement`, e.g.:\n",
       "[{\"attribute\":\"", item.attributes[[current_type]][1], "\",\"statement\":\"Your item here.\"}, …]\n",
       "This JSON formatting is EXTREMELY important. ONLY output the items in this formatting; DO NOT include any other text in your response.",
-      ifelse(is.null(examples_str), "", paste0("\n\nHere are some EXAMPLE high-quality items that already exist on the scale that you can",
-            " emulate in terms of QUALITY ONLY; since we want NOVEL items, do NOT rephrase/copy any of these examples.\n", examples_str
+      ifelse(is.null(examples_str), "", paste0("To better help you understand how EXACTLY to phrase/constuct your items,",
+               " here are some EXAMPLE high-quality items that already exist on the scale that you MUST",
+            " emulate in terms of QUALITY, item STRUCTURE (how the item is framed/setup/constructed).",
+            " Remember that we want each item to be NOVEL and DISTINCT on this scale to best capture as much variance as possible,",
+            " so do NOT recycle any of these examples' core content.\n", examples_str
         )
       )
     ) } else {
@@ -165,12 +168,15 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
         "Difficulty Definitions:\n", definitions_text, "\n\n",
         "Do NOT create any items that fall between or outside these clearly defined levels.",
         " Generate EXACTLY FOUR items PER difficulty level. Use the difficulty levels EXACTLY as provided; do NOT add your own or leave any out." ,
-        "\nEACH item should be ROBUST and DISTINCTLY worded relative to other items. \n",
+        "\nEACH item should be ROBUST, NOVEL, and UNIQUE. This items must be top-quality. \n",
         "Return output STRICTLY as a JSON array of objects, each with keys `difficulty`, `statement`, and `answer`. E.g.:\n",
         "[{\"difficulty\":\"", item.attributes[[current_type]][1], "\",\"statement\":\"Your item here.\",\"answer\":\"The correct answer to your item here.\"}, …]\n",
         "This JSON formatting is EXTREMELY important. ONLY output the items in this formatting; DO NOT include any other text in your response.",
-        ifelse(is.null(examples_str), "", paste0("\n\nHere are some EXAMPLE high-quality items that already exist on the scale that you can",
-                                                 " emulate in terms of QUALITY ONLY; since we want NOVEL items, do NOT rephrase/copy any of these examples.\n", examples_str
+        ifelse(is.null(examples_str), "", paste0("\n\nTo better help you understand how EXACTLY to phrase/constuct your items,",
+        " here are some EXAMPLE high-quality items that already exist on the scale that you MUST",
+          " emulate in terms of QUALITY, item (and answer) STRUCTURE, and question (and answer) framing/setup.",
+        " Remember that we want each item to be NOVEL and DISTINCT on this scale to best capture as much variance as possible,",
+        " so do NOT recycle any of these examples' core content.\n", examples_str
         )
         )
       )
@@ -193,6 +199,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #' @param current_items A data frame of the current items collected so far. Defaults to an empty data frame.
 #' @param current_label A string of the item type currently being examined
 #' @param valid_attributes A list of attributes that corresponds to the current item type.
+#' @param performance A flag describing whether we are in performance mode or not
 #' @return A data frame with columns:
 #' \describe{
 #'   \item{\code{type}}{The general type associated with each item.}
@@ -201,7 +208,7 @@ create.prompts <- function(item.attributes, item.type.definitions, scale.title, 
 #' }
 clean_items <- function(response,
                         current_items = data.frame("type" = NULL, "attribute"= NULL, "statement" = NULL),
-                        current_label, valid_attributes) {
+                        current_label, valid_attributes, performance) {
 
   raw <- response$choices[[1]]$message$content
   json_txt <- extract_json_array(raw)
@@ -216,22 +223,42 @@ clean_items <- function(response,
     return(current_items)
   }
 
+  if(!performance){
   if(!all(colnames(parsed) %in% c("statement", "attribute"))){
     return(current_items)
+  }} else {
+    if(!all(colnames(parsed) %in% c("statement", "difficulty", "answer"))){
+      return(current_items)
+  } }
+
+  # Trim whitespace from columns
+  parsed$statement <- trimws(parsed$statement)
+
+  if(!performance){
+  parsed$attribute <- trimws(parsed$attribute)
+  } else {
+    parsed$difficulty <- trimws(parsed$difficulty)
+    parsed$answer <- trimws(parsed$answer)
   }
 
-  # Trim whitespace from both columns
-  parsed$statement <- trimws(parsed$statement)
-  parsed$attribute <- trimws(parsed$attribute)
-
   # Check for empty cells or NAs
+  if(!performance){
   if(any(is.na(parsed$statement)) || any(parsed$statement == "") ||
      any(is.na(parsed$attribute)) || any(parsed$attribute == "")) {
     return(current_items)
-  }
+  }} else {
+    if(any(is.na(parsed$statement)) || any(parsed$statement == "") ||
+       any(is.na(parsed$difficulty)) || any(parsed$difficulty == "") ||
+       any(is.na(parsed$answer)) || any(parsed$answer == "")) {
+      return(current_items)
+  }}
 
   # Normalize attributes for comparison (trim and lowercase)
+  if(!performance){
   normalized_parsed_attr <- tolower(parsed$attribute)
+  } else {
+  normalized_parsed_attr <- tolower(parsed$difficulty)
+  }
   normalized_valid_attr <- tolower(valid_attributes)
 
   # Check that every parsed attribute is in the list of valid attributes
@@ -240,12 +267,21 @@ clean_items <- function(response,
   }
 
   # If all validations pass, create a new data frame
+  if(!performance){
   new_items <- data.frame(
-    type      = rep(current_label, length(attribute)),
+    type      = current_label,
     attribute = tolower(trimws(parsed$attribute)),
     statement = trimws(parsed$statement),
     stringsAsFactors = FALSE
-  )
+  )} else {
+    new_items <- data.frame(
+      type      = current_label,
+      difficulty = tolower(trimws(parsed$difficulty)),
+      statement = trimws(parsed$statement),
+      answer = trimws(parsed$answer),
+      stringsAsFactors = FALSE
+    )
+  }
 
   # Combine with current items and remove duplicates (case-insensitive and punctuation removed)
   current_items <- rbind(current_items, new_items)
@@ -460,7 +496,8 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, EG
 
   # Initial BootEGA call
   bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                               verbose = verbose, model = model, algorithm = EGA.algorithm, seed = seed)
+                               verbose = verbose, model = model, algorithm = EGA.algorithm, seed = seed,
+                               plot.typicalStructure = FALSE)
   boot1 <- bootstrap
 
   # Check for NA values in empirical dimensions and filter items if needed
@@ -485,7 +522,8 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, EG
     # Run BootEGA on the filtered items
     bootstrap <- EGAnet::bootEGA(items, clear = TRUE, suppress = TRUE,
                                  plot.itemStability = FALSE, verbose = verbose,
-                                 model = model, algorithm = EGA.algorithm, seed = seed)
+                                 model = model, algorithm = EGA.algorithm, seed = seed,
+                                 plot.typicalStructure = FALSE)
 
     # Check for NAs again and filter if necessary
     empirical_dims <- bootstrap$stability$item.stability$item.stability$empirical.dimensions
@@ -528,9 +566,10 @@ remove_instabilities <- function(items, cut.off = 0.75, verbose, seed, model, EG
 #' @param item_type A character string of the current item type undergoing reduction
 #' @param keep.org A logical that specifies whether or not the user wants to keep the original items
 #' @param silently Logical; if \code{TRUE}, suppresses console output. Defaults to \code{FALSE}.
+#' @param performance Logical; denotes whether we are in performance mode
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, EGA objects, bootEGA objects, embeddings, NMI values, and other analysis details.
-get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai.key, item_type, keep.org, silently, ...) {
+get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai.key, item_type, keep.org, silently, performance, ...) {
 
   # Define the possible models
   possible_models <- c("tmfg", "glasso")
@@ -555,7 +594,7 @@ get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai
 
     results[[EGA.model]] <- compute_EGA(items=items, EGA.model = EGA.model, EGA.algorithm=EGA.algorithm,
                                         embedding = embedding, openai.key = openai.key,
-                                        silently = silently)
+                                        silently = silently, performance = performance)
 
     chosen_model <- EGA.model
     chosen_result <- results[[EGA.model]]
@@ -565,7 +604,7 @@ get_results <- function(items, EGA.model, EGA.algorithm, embedding.model, openai
     for (model in possible_models) {
       results[[model]] <- compute_EGA(items=items, EGA.model = model, EGA.algorithm=EGA.algorithm,
                                       embedding = embedding, openai.key = openai.key,
-                                      silently = silently)
+                                      silently = silently, performance = performance)
     }
 
     # Compare NMIs to select the best model
@@ -687,9 +726,10 @@ print_results<-function(obj, obj2){
 #' @param embedding A matrix of embeddings for the items.
 #' @param openai.key A character string of your OpenAI API key.
 #' @param silently Logical; if \code{TRUE}, suppresses console output.
+#' @param performance A flag denoting whether we are in performance mode or not
 #' @param ... Additional arguments passed to underlying functions.
 #' @return A list containing the main results, final and initial EGA and bootEGA objects, embeddings, NMI values, and item counts before and after reduction.
-compute_EGA <- function(items, EGA.model, EGA.algorithm, embedding, openai.key, silently, ...) {
+compute_EGA <- function(items, EGA.model, EGA.algorithm, embedding, openai.key, silently, performance, ...) {
   if (!silently) {
     cat("\n")
     cat(paste0("Computing EGA steps using ", EGA.model, "..."))
@@ -831,6 +871,7 @@ compute_EGA <- function(items, EGA.model, EGA.algorithm, embedding, openai.key, 
     EGA_communities = final_ega$wc[match(matched_statements, colnames(item_set))],
     stringsAsFactors = FALSE
   )
+
   row.names(result) <- NULL
 
   # Attach summary metrics as attributes to the result
@@ -1037,14 +1078,16 @@ compute_ega_full_sample <- function(embedding, embedding_reduced, items, items_r
     temp <- colnames(embedding_use)
     colnames(embedding_use) <- items$ID
     bootstrap1 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                                  seed = 1234, verbose = verbose, model = model_used, algorithm = EGA.algorithm)
+                                  seed = 1234, verbose = verbose, model = model_used, algorithm = EGA.algorithm,
+                                  plot.typicalStructure = FALSE)
     colnames(embedding_use) <- temp
 
     embedding_use <- if (embedding_type == "full") embedding_reduced else embedding_reduced_sparse
     temp <- colnames(embedding_use)
     colnames(embedding_use) <- items_reduced$ID
     bootstrap2 <- EGAnet::bootEGA(embedding_use, clear = TRUE, suppress = TRUE, plot.itemStability = FALSE,
-                                  seed = 1234, verbose = verbose, model = model_used, algorithm = EGA.algorithm)
+                                  seed = 1234, verbose = verbose, model = model_used, algorithm = EGA.algorithm,
+                                  plot.typicalStructure = FALSE)
     colnames(embedding_use) <- temp
 
     if (!silently) {

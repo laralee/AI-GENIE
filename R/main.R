@@ -374,6 +374,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
       custom = custom,
       adaptive = adaptive,
       silently = silently,
+      performance = FALSE,
       ...
     )
 
@@ -394,6 +395,7 @@ AIGENIE <- function(item.attributes, openai.API, groq.API = NULL, custom = FALSE
     plot.stability = plot.stability,
     calc.final.stability = calc.final.stability,
     silently = silently,
+    performance = FALSE,
     ...
   )
 
@@ -744,7 +746,7 @@ p_AIGENIE <- function(item.difficulty, level.description=NULL, openai.API, groq.
   silently            <- validated$silently
   level.description <- validated$level.description
 
-  return(generated_items <- generate.items.internal(
+generated_items <- generate.items.internal(
     model = model,
     temperature = temperature,
     top.p = top.p,
@@ -765,14 +767,30 @@ p_AIGENIE <- function(item.difficulty, level.description=NULL, openai.API, groq.
     performance = TRUE,
     audience = audience,
     level.description = level.description
-  ))
+  )
+
+  names(generated_items)[names(generated_items) == "difficulty"] <- "attribute"
 
   if(!items.only){
     # run the pipeline
     run_pipeline <- run_pipeline(items = generated_items, EGA.model = EGA.model, EGA.algorithm= EGA.algorithm,
                                  openai.key=openai.API, embedding.model=embedding.model,
                                  labels = run_pipeline$type, keep.org=FALSE, plot = plot, plot.stability = plot.stability,
-                                 silently= silently, calc.final.stability = calc.final.stability)
+                                 silently= silently, calc.final.stability = calc.final.stability, performance = TRUE)
+
+    # add the appropriate answers to the questions
+    answers <- generated_items$answer[trimws(generated_items$statement) %in% trimws(run_pipeline$overall_sample$main_result$statement)]
+    run_pipeline$overall_sample$main_result$answer <- answers
+
+    colnames(run_pipeline$overall_sample$main_result)[colnames(run_pipeline$overall_sample$main_result) == "attribute"] <-  "difficulty"
+
+    # add the appropriate answers to the questions at the item level analysis
+    for(i in 1:length(run_pipeline$item_type_level)){
+      answers <- generated_items$answer[trimws(generated_items$statement) %in% trimws(run_pipeline$item_type_level[[i]]$main_result$statement)]
+      run_pipeline$item_type_level[[i]]$main_result$answer <- answers
+
+      colnames(run_pipeline$item_type_level[[i]]$main_result)[colnames(run_pipeline$item_type_level[[i]]$main_result) == "attribute"] <-  "difficulty"
+    }
 
     return(run_pipeline)
   } else {
