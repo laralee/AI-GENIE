@@ -162,7 +162,7 @@ clean_items <- function(response,
 #' @param sub.domain An optional character string specifying the inventory's sub-domain or specialty.
 #' @param item.examples An optional character vector of example item strings.
 #' @return A character string containing the system role prompt for the language model.
-create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples) {
+create.system.role.prompt <- function(system.role, item.types, scale.title, sub.domain, item.examples, audience, performance) {
   # add default system role if none was provided
 
   if(item.examples == ""){
